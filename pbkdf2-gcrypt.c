@@ -44,32 +44,38 @@ static
 int
 get_gcrypt_hash_id(struct pbkdf_prf_algo *hash)
 {
-	if	(strcmp(hash->name, "RIPEMD160") == 0)
-		return GCRY_MD_RMD160;
-	else if (strcmp(hash->name, "SHA512") == 0)
-		return GCRY_MD_SHA512;
-	else if	(strcmp(hash->name, "whirlpool") == 0)
-		return GCRY_MD_WHIRLPOOL;
-	else
-		return -1;
+    if  (strcmp(hash->name, "RIPEMD160") == 0)
+        return GCRY_MD_RMD160;
+    else if (strcmp(hash->name, "SHA512") == 0)
+        return GCRY_MD_SHA512;
+    else if (strcmp(hash->name, "whirlpool") == 0)
+        return GCRY_MD_WHIRLPOOL;
+    else
+        return -1;
 }
 
 int
 pbkdf2(struct pbkdf_prf_algo *hash, const char *pass, int passlen,
     const unsigned char *salt, int saltlen,
-    int keylen, unsigned char *out)
+    int keylen, unsigned char *out, int custom_iterations)
 {
-	gpg_error_t err;
+    gpg_error_t err;
 
-	err = gcry_kdf_derive(pass, passlen, GCRY_KDF_PBKDF2,
-	    get_gcrypt_hash_id(hash),
-            salt, saltlen, hash->iteration_count, keylen, out);
+    if (custom_iterations == 0) custom_iterations = hash->iteration_count;
+    if (custom_iterations <= 0) {
+        tc_log(1, "Wrong custom iterations count\n");
+        return EINVAL;
+    }
 
-	if (err) {
-		tc_log(1, "Error in PBKDF2\n");
-		return EINVAL;
-	}
+    err = gcry_kdf_derive(pass, passlen, GCRY_KDF_PBKDF2,
+        get_gcrypt_hash_id(hash),
+            salt, saltlen, custom_iterations, keylen, out);
 
-	return 0;
+    if (err) {
+        tc_log(1, "Error in PBKDF2\n");
+        return EINVAL;
+    }
+
+    return 0;
 }
 

@@ -32,49 +32,49 @@
 #ifndef _TCPLAY_H
 #define _TCPLAY_H
 
-#define MAX_BLKSZ		4096
-#define MAX_KEYSZ		192
-#define HDRSZ			512
-#define HDR_OFFSET_SYS		31744	/* 512 * (63 -1) */
-#define TC_SIG			"TRUE"
-#define MAX_PASSSZ		64
-#define PASS_BUFSZ		256
-#define KPOOL_SZ		64
-#define MAX_KFILE_SZ		1048576	/* 1 MB */
-#define MAX_KEYFILES		256
-#define HDR_OFFSET_HIDDEN	65536
-#define BACKUP_HDR_HIDDEN_OFFSET_END	65536
-#define BACKUP_HDR_OFFSET_END	131072
-#define SALT_LEN		64
-#define VOL_RSVD_BYTES_START	(256*512) /* Reserved bytes at vol. start */
-#define VOL_RSVD_BYTES_END	(256*512) /* Reserved bytes at vol. end */
-#define MIN_VOL_BYTES		(VOL_RSVD_BYTES_START + VOL_RSVD_BYTES_END)
+#define MAX_BLKSZ       4096
+#define MAX_KEYSZ       192
+#define HDRSZ           512
+#define HDR_OFFSET_SYS      31744   /* 512 * (63 -1) */
+#define TC_SIG          "TRUE"
+#define MAX_PASSSZ      64
+#define PASS_BUFSZ      256
+#define KPOOL_SZ        64
+#define MAX_KFILE_SZ        1048576 /* 1 MB */
+#define MAX_KEYFILES        256
+#define HDR_OFFSET_HIDDEN   65536
+#define BACKUP_HDR_HIDDEN_OFFSET_END    65536
+#define BACKUP_HDR_OFFSET_END   131072
+#define SALT_LEN        64
+#define VOL_RSVD_BYTES_START    (256*512) /* Reserved bytes at vol. start */
+#define VOL_RSVD_BYTES_END  (256*512) /* Reserved bytes at vol. end */
+#define MIN_VOL_BYTES       (VOL_RSVD_BYTES_START + VOL_RSVD_BYTES_END)
 
-#define MAX_CIPHER_CHAINS	64
-#define DEFAULT_RETRIES		3
-#define ERASE_BUFFER_SIZE	4*1024*1024 /* 4 MB */
+#define MAX_CIPHER_CHAINS   64
+#define DEFAULT_RETRIES     3
+#define ERASE_BUFFER_SIZE   4*1024*1024 /* 4 MB */
 
 /* TrueCrypt Volume flags */
-#define TC_VOLFLAG_SYSTEM	0x01	/* system encryption */
-#define TC_VOLFLAG_INPLACE	0x02	/* non-system in-place-encrypted volume */
+#define TC_VOLFLAG_SYSTEM   0x01    /* system encryption */
+#define TC_VOLFLAG_INPLACE  0x02    /* non-system in-place-encrypted volume */
 
-#define TC_VOLFLAG_SET(f, x)	((f & TC_VOLFLAG_##x) == TC_VOLFLAG_##x)
+#define TC_VOLFLAG_SET(f, x)    ((f & TC_VOLFLAG_##x) == TC_VOLFLAG_##x)
 
-#define LOG_BUFFER_SZ		1024
+#define LOG_BUFFER_SZ       1024
 #if 0
 #define DEBUG 1
 #endif
 
-#define TC_FLAG_SYS		0x0001
-#define TC_FLAG_FDE		0x0002
-#define TC_FLAG_BACKUP		0x0004
-#define TC_FLAG_ONLY_RESTORE	0x0008
-#define TC_FLAG_ALLOW_TRIM	0x0010
-#define TC_FLAG_SAVE_TO_FILE	0x0020
-#define TC_FLAG_HDR_FROM_FILE	0x0040
-#define TC_FLAG_H_HDR_FROM_FILE	0x0080
+#define TC_FLAG_SYS     0x0001
+#define TC_FLAG_FDE     0x0002
+#define TC_FLAG_BACKUP      0x0004
+#define TC_FLAG_ONLY_RESTORE    0x0008
+#define TC_FLAG_ALLOW_TRIM  0x0010
+#define TC_FLAG_SAVE_TO_FILE    0x0020
+#define TC_FLAG_HDR_FROM_FILE   0x0040
+#define TC_FLAG_H_HDR_FROM_FILE 0x0080
 
-#define TC_FLAG_SET(f, x)	((f & TC_FLAG_##x) == TC_FLAG_##x)
+#define TC_FLAG_SET(f, x)   ((f & TC_FLAG_##x) == TC_FLAG_##x)
 
 #include <limits.h>
 #include <inttypes.h>
@@ -91,139 +91,141 @@ typedef uint64_t disksz_t;
 
 
 struct pbkdf_prf_algo {
-	const char *name;
-	int iteration_count;
+    const char *name;
+    int iteration_count;
 };
 
 struct tc_crypto_algo {
-	const char *name;
-	const char *dm_crypt_str;
-	int klen;
-	int ivlen;
+    const char *name;
+    const char *dm_crypt_str;
+    int klen;
+    int ivlen;
 };
 
 struct tc_cipher_chain {
-	struct tc_crypto_algo *cipher;
-	unsigned char *key;
-	char dm_key[MAX_KEYSZ*2 + 1];
+    struct tc_crypto_algo *cipher;
+    unsigned char *key;
+    char dm_key[MAX_KEYSZ*2 + 1];
 
-	struct tc_cipher_chain *prev;
-	struct tc_cipher_chain *next;
+    struct tc_cipher_chain *prev;
+    struct tc_cipher_chain *next;
 };
 
 struct tchdr_enc {
-	unsigned char salt[SALT_LEN];	/* Salt for PBKDF */
-	unsigned char enc[448];		/* Encrypted part of the header */
+    unsigned char salt[SALT_LEN];   /* Salt for PBKDF */
+    unsigned char enc[448];     /* Encrypted part of the header */
 } __attribute__((__packed__));
 
 struct tchdr_dec {
-	char		tc_str[4];	/* ASCII string "TRUE" */
-	uint16_t	tc_ver;		/* Volume header format version */
-	uint16_t	tc_min_ver;
-	uint32_t	crc_keys;	/* CRC32 of the key section */
-	uint64_t	vol_ctime;	/* Volume creation time */
-	uint64_t	hdr_ctime;	/* Header creation time */
-	uint64_t	sz_hidvol;	/* Size of hidden volume (set to zero
-					   in non-hidden volumes) */
-	uint64_t	sz_vol;		/* Size of volume */
-	uint64_t	off_mk_scope;	/* Byte offset of the start of the
-					   master key scope */
-	uint64_t	sz_mk_scope;	/* Size of the encrypted area within
-					   the master key scope */
-	uint32_t	flags;		/* Flag bits
-					   (bit 0: system encryption;
-					   bit 1: non-system in-place-encrypted volume;
-					   bits 2–31 are reserved) */
-	uint32_t	sec_sz;		/* Sector size (in bytes) */
-	unsigned char	unused3[120];
-	uint32_t	crc_dhdr;	/* CRC32 of dec. header (except keys) */
-	unsigned char	keys[256];
+    char        tc_str[4];  /* ASCII string "TRUE" */
+    uint16_t    tc_ver;     /* Volume header format version */
+    uint16_t    tc_min_ver;
+    uint32_t    crc_keys;   /* CRC32 of the key section */
+    uint64_t    vol_ctime;  /* Volume creation time */
+    uint64_t    hdr_ctime;  /* Header creation time */
+    uint64_t    sz_hidvol;  /* Size of hidden volume (set to zero
+                       in non-hidden volumes) */
+    uint64_t    sz_vol;     /* Size of volume */
+    uint64_t    off_mk_scope;   /* Byte offset of the start of the
+                       master key scope */
+    uint64_t    sz_mk_scope;    /* Size of the encrypted area within
+                       the master key scope */
+    uint32_t    flags;      /* Flag bits
+                       (bit 0: system encryption;
+                       bit 1: non-system in-place-encrypted volume;
+                       bits 2–31 are reserved) */
+    uint32_t    sec_sz;     /* Sector size (in bytes) */
+    unsigned char   unused3[120];
+    uint32_t    crc_dhdr;   /* CRC32 of dec. header (except keys) */
+    unsigned char   keys[256];
 } __attribute__((__packed__));
 
 struct tcplay_info {
-	char dev[PATH_MAX];
-	struct tchdr_dec *hdr;
-	struct tc_cipher_chain *cipher_chain;
-	struct pbkdf_prf_algo *pbkdf_prf;
-	char key[MAX_KEYSZ*2 + 1];
+    char dev[PATH_MAX];
+    struct tchdr_dec *hdr;
+    struct tc_cipher_chain *cipher_chain;
+    struct pbkdf_prf_algo *pbkdf_prf;
+    char key[MAX_KEYSZ*2 + 1];
 
-	int flags;
-	int volflags;
+    int flags;
+    int volflags;
 
-	uint32_t blk_sz;
+    uint32_t blk_sz;
 
-	off_t start;	/* Logical volume offset in table (in blk_sz blocks) */
-	disksz_t size;	/* Volume size (in blk_sz blocks) */
+    off_t start;    /* Logical volume offset in table (in blk_sz blocks) */
+    disksz_t size;  /* Volume size (in blk_sz blocks) */
 
-	off_t skip;	/* IV offset (in blk_sz blocks) */
-	off_t offset;	/* Block offset (in blk_sz blocks) */
+    off_t skip; /* IV offset (in blk_sz blocks) */
+    off_t offset;   /* Block offset (in blk_sz blocks) */
 
-	/* Populated by dm_setup */
-	uuid_t uuid;
+    /* Populated by dm_setup */
+    uuid_t uuid;
 
-	int hidden;
+    int hidden;
 };
 
 #define INFO_TO_DM_BLOCKS(info, memb) \
     (((info)->memb * (uint64_t)((info)->blk_sz))/512)
 
 struct tcplay_dm_table {
-	char device[PATH_MAX];	/* Underlying device */
-	char target[256];	/* DM Target type */
-	off_t start;		/* Logical volume offset in table */
-	disksz_t size;		/* Volume size */
+    char device[PATH_MAX];  /* Underlying device */
+    char target[256];   /* DM Target type */
+    off_t start;        /* Logical volume offset in table */
+    disksz_t size;      /* Volume size */
 
-	char cipher[256];	/* Cipher */
-	off_t skip;		/* IV offset */
-	off_t offset;		/* Block offset */
+    char cipher[256];   /* Cipher */
+    off_t skip;     /* IV offset */
+    off_t offset;       /* Block offset */
 };
 
 
 typedef int (*tc_state_change_fn)(void *, const char *, int);
 
 struct tcplay_opts {
-	/* (Mostly) common options */
-	const char	*dev;
-	const char	*keyfiles[MAX_KEYFILES];
-	int		nkeyfiles;
-	const char	*h_keyfiles[MAX_KEYFILES];
-	int		n_hkeyfiles;
-	struct pbkdf_prf_algo	*prf_algo;
-	struct tc_cipher_chain	*cipher_chain;
-	struct pbkdf_prf_algo	*h_prf_algo;
-	struct tc_cipher_chain	*h_cipher_chain;
-	const char	*passphrase;
-	const char	*h_passphrase;
-	int		interactive;
-	int		weak_keys_and_salt;
+    /* (Mostly) common options */
+    const char  *dev;
+    const char  *keyfiles[MAX_KEYFILES];
+    int     nkeyfiles;
+    const char  *h_keyfiles[MAX_KEYFILES];
+    int     n_hkeyfiles;
+    struct pbkdf_prf_algo   *prf_algo;
+    struct tc_cipher_chain  *cipher_chain;
+    struct pbkdf_prf_algo   *h_prf_algo;
+    struct tc_cipher_chain  *h_cipher_chain;
+    const char  *passphrase;
+    const char  *h_passphrase;
+    int     interactive;
+    int     weak_keys_and_salt;
 
-	/* Options for create */
-	int		hidden;
-	disksz_t	hidden_size_bytes;
-	int		secure_erase; /* XXX: default to 1! */
+    /* Options for create */
+    int     hidden;
+    disksz_t    hidden_size_bytes;
+    int     secure_erase; /* XXX: default to 1! */
 
-	/* Options for map, info_mapped */
-	const char	*map_name;
+    /* Options for map, info_mapped */
+    const char  *map_name;
 
-	/* Options for info, map, modify */
-	int		flags;
-	const char	*sys_dev;
-	int		protect_hidden;
-	int		retries;	/* XXX: default to DEFAULT_RETRIES */
-	time_t		timeout;
+    /* Options for info, map, modify */
+    int     flags;
+    const char  *sys_dev;
+    int     protect_hidden;
+    int     retries;    /* XXX: default to DEFAULT_RETRIES */
+    time_t      timeout;
 
-	const char	*hdr_file_in;
-	const char	*h_hdr_file_in;
+    const char  *hdr_file_in;
+    const char  *h_hdr_file_in;
 
-	/* Options for modify only */
-	struct pbkdf_prf_algo	*new_prf_algo;
-	const char	*new_passphrase;
-	const char	*hdr_file_out;
-	const char	*new_keyfiles[MAX_KEYFILES];
-	int		n_newkeyfiles;
+    /* Options for modify only */
+    struct pbkdf_prf_algo   *new_prf_algo;
+    const char  *new_passphrase;
+    const char  *hdr_file_out;
+    const char  *new_keyfiles[MAX_KEYFILES];
+    int     n_newkeyfiles;
 
-	void		*api_ctx;
-	tc_state_change_fn	state_change_fn;
+    void        *api_ctx;
+    tc_state_change_fn  state_change_fn;
+
+    int custom_iterations;
 };
 
 
@@ -266,7 +268,7 @@ int syscrypt(struct tc_crypto_algo *cipher, unsigned char *key, size_t klen,
     int do_encrypt);
 int pbkdf2(struct pbkdf_prf_algo *hash, const char *pass, int passlen,
     const unsigned char *salt, int saltlen,
-    int keylen, unsigned char *out);
+    int keylen, unsigned char *out, int custom_iterations);
 
 int apply_keyfiles(unsigned char *pass, size_t pass_memsz, const char *keyfiles[],
     int nkeyfiles);
@@ -275,13 +277,14 @@ struct tchdr_enc *create_hdr(unsigned char *pass, int passlen,
     struct pbkdf_prf_algo *prf_algo, struct tc_cipher_chain *cipher_chain,
     size_t sec_sz, disksz_t total_blocks,
     off_t offset, disksz_t blocks, int hidden, int weak,
-    struct tchdr_enc **backup_hdr);
+    struct tchdr_enc **backup_hdr,
+    int custom_iterations);
 struct tchdr_dec *decrypt_hdr(struct tchdr_enc *ehdr,
     struct tc_cipher_chain *cipher_chain, unsigned char *key);
 int verify_hdr(struct tchdr_dec *hdr);
 struct tchdr_enc *copy_reencrypt_hdr(unsigned char *pass, int passlen,
     struct pbkdf_prf_algo *prf_algo, int weak, struct tcplay_info *info,
-    struct tchdr_enc **backup_hdr);
+    struct tchdr_enc **backup_hdr, int custom_iterations);
 
 void *_alloc_safe_mem(size_t req_sz, const char *file, int line);
 void *_strdup_safe_mem(const char *in, const char *file, int line);
@@ -302,7 +305,7 @@ int free_info(struct tcplay_info *info);
 void print_info(struct tcplay_info *info);
 int adjust_info(struct tcplay_info *info, struct tcplay_info *hinfo);
 int process_hdr(const char *dev, int flags, unsigned char *pass, int passlen,
-    struct tchdr_enc *ehdr, struct tcplay_info **pinfo);
+    struct tchdr_enc *ehdr, struct tcplay_info **pinfo, int custom_iterations);
 int create_volume(struct tcplay_opts *opts);
 struct tcplay_info *info_map_common(struct tcplay_opts *opts,
     char *passphrase_out);
@@ -322,23 +325,23 @@ extern summary_fn_t summary_fn;
 extern struct pbkdf_prf_algo pbkdf_prf_algos[];
 extern struct tc_cipher_chain *tc_cipher_chains[MAX_CIPHER_CHAINS];
 
-#define STATE_UNKNOWN		0
-#define STATE_GET_RANDOM	1
-#define STATE_ERASE		2
+#define STATE_UNKNOWN       0
+#define STATE_GET_RANDOM    1
+#define STATE_ERASE     2
 
 extern int tc_internal_state;
-#ifndef	__DECONST
-#define	__DECONST(type, var)	((type)(uintptr_t)(const void *)(var))
+#ifndef __DECONST
+#define __DECONST(type, var)    ((type)(uintptr_t)(const void *)(var))
 #endif
 
 #define alloc_safe_mem(x) \
-	_alloc_safe_mem(x, __FILE__, __LINE__)
+    _alloc_safe_mem(x, __FILE__, __LINE__)
 
 #define strdup_safe_mem(x) \
-	_strdup_safe_mem(x, __FILE__, __LINE__)
+    _strdup_safe_mem(x, __FILE__, __LINE__)
 
 #define free_safe_mem(x) \
-	_free_safe_mem(__DECONST(void *, x), __FILE__, __LINE__)
+    _free_safe_mem(__DECONST(void *, x), __FILE__, __LINE__)
 
 #define __unused       __attribute__((__unused__))
 
