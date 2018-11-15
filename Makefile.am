@@ -1,0 +1,58 @@
+AUTOMAKE_OPTIONS = foreign subdir-objects
+ACLOCAL_AMFLAGS = -I aux
+
+EXTRA_PROGRAMS = tc-yubico-piv-tool
+
+bin_PROGRAMS      = tcplay
+
+if ENABLE_TC_DEBUG
+CFLAGS+= -DDEBUG
+endif
+
+if ENABLE_TC_YUBICO_DEBUG
+CFLAGS+= -DTC_YK_DEBUG
+endif
+
+CRYPTOS=pbkdf2-gcrypt.c
+
+
+TCPLAY_LIBS= @TCPLAY_DEPS_LIBS@
+TCPLAY_EXTRACFLAGS= @TCPLAY_DEPS_CFLAGS@
+YUBICO_SOURCE=
+ARGON2_SOURCE=
+
+YUBICO_PIV_COMMON= yubico/piv.c yubico/piv-pin.c
+
+
+if WITH_YUBICO_PIV
+bin_PROGRAMS+= yubico-keyfile
+TCPLAY_LIBS+= @YKPIV_LIBS@
+TCPLAY_EXTRACFLAGS+= @YKPIV_CFLAGS@
+YUBICO_SOURCE+= $(YUBICO_PIV_COMMON) yubico/tc-common.c
+endif
+
+if WITH_YUBICO_CHL
+TCPLAY_EXTRACFLAGS+= @YKCHL_CFLAGS@
+TCPLAY_LIBS+= @YKCHL_LIBS@
+YUBICO_SOURCE+= yubico/chalresp.c
+endif
+
+if WITH_ARGON2
+TCPLAY_LIBS+= @ARGON2_LIBS@
+TCPLAY_EXTRACFLAGS+= @ARGON2_CFLAGS@
+ARGON2_SOURCE+= argon2.c
+endif
+
+yubico_keyfile_SOURCES = yubico/yubico-keyfile.c safe_mem.c $(YUBICO_PIV_COMMON)
+yubico_keyfile_CFLAGS = @YKPIV_CFLAGS@ -Wall
+yubico_keyfile_LDADD = @YKPIV_LIBS@ -lgcrypt
+
+
+tcplay_CFLAGS = -DMAJ_VER=2 -DMIN_VER=0 -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
+				-Wall $(TCPLAY_EXTRACFLAGS)
+
+tcplay_SOURCES = \
+	tcplay.c crc32.c safe_mem.c io.c hdr.c humanize.c \
+	crypto.c crypto-gcrypt.c main.c generic_xts.c $(CRYPTOS) $(YUBICO_SOURCE) $(ARGON2_SOURCE)
+
+tcplay_LDADD = $(TCPLAY_LIBS)

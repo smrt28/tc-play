@@ -137,6 +137,8 @@ get_gcrypt_cipher_id(struct tc_crypto_algo *cipher)
 		return GCRY_CIPHER_SERPENT128;
 	else if (strcmp(cipher->name, "SERPENT-256-XTS") == 0)
 		return GCRY_CIPHER_SERPENT256;
+    else if (strcmp(cipher->name, "CAMELLIA-256-XTS") == 0)
+        return GCRY_CIPHER_CAMELLIA256;
 	else
 		return -1;
 }

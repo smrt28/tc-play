@@ -86,6 +86,8 @@ get_cryptodev_cipher_id(struct tc_crypto_algo *cipher)
 		return CRYPTO_SERPENT_XTS;
 	else if (strcmp(cipher->name, "SERPENT-256-XTS") == 0)
 		return CRYPTO_SERPENT_XTS;
+    else if (strcmp(cipher->name, "CAMELLIA-256-XTS") == 0)
+        return CRYPTO_CAMELLIA_XTS;
 	else
 		return -1;
 }

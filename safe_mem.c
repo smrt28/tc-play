@@ -35,162 +35,186 @@
 
 #include "tcplay.h"
 
+#ifdef DEBUG
+
+#   define SAFE_MEM_REPORTING // TODO: make it configurable
+
+#endif
+
 struct safe_mem_hdr {
-	struct safe_mem_hdr	*prev;
-	struct safe_mem_hdr	*next;
-	struct safe_mem_tail	*tail;
-	const char	*file;
-	int		line;
-	size_t		alloc_sz;
-	char		sig[8]; /* SAFEMEM */
+    struct safe_mem_hdr *prev;
+    struct safe_mem_hdr *next;
+    struct safe_mem_tail    *tail;
+    const char  *file;
+    int     line;
+    size_t      alloc_sz;
+    char        sig[8]; /* SAFEMEM */
 };
 
 struct safe_mem_tail {
-	char sig[8]; /* SAFEMEM */
+    char sig[8]; /* SAFEMEM */
 };
 
 static struct safe_mem_hdr *safe_mem_hdr_first = NULL;
+static int safe_mem_global_lock_enabled = 0;
+
+int enable_safe_mem_global_lock(void) {
+    if (safe_mem_global_lock_enabled) return 0;
+    if (mlockall(MCL_CURRENT | MCL_FUTURE) == 0) {
+        safe_mem_global_lock_enabled = 1;
+        return 0;
+    }
+    return -1;
+}
 
 void *
 _alloc_safe_mem(size_t req_sz, const char *file, int line)
 {
-	struct safe_mem_hdr *hdr, *hdrp;
-	struct safe_mem_tail *tail;
-	size_t alloc_sz;
-	char *mem, *user_mem;
+    struct safe_mem_hdr *hdr, *hdrp;
+    struct safe_mem_tail *tail;
+    size_t alloc_sz;
+    char *mem, *user_mem;
 
-	alloc_sz = req_sz + sizeof(*hdr) + sizeof(*tail);
-	if ((mem = malloc(alloc_sz)) == NULL)
-		return NULL;
+    alloc_sz = req_sz + sizeof(*hdr) + sizeof(*tail);
+    if ((mem = malloc(alloc_sz)) == NULL)
+        return NULL;
 
-	if (mlock(mem, alloc_sz) < 0) {
-		free(mem);
-		return NULL;
-	}
+    if (!safe_mem_global_lock_enabled) {
+        if (mlock(mem, alloc_sz) < 0) {
+            free(mem);
+            return NULL;
+        }
+    }
 
-	memset(mem, 0, alloc_sz);
+    memset(mem, 0, alloc_sz);
 
-	hdr = (struct safe_mem_hdr *)mem;
-	tail = (struct safe_mem_tail *)(mem + alloc_sz - sizeof(*tail));
-	user_mem = mem + sizeof(*hdr);
+    hdr = (struct safe_mem_hdr *)mem;
+    tail = (struct safe_mem_tail *)(mem + alloc_sz - sizeof(*tail));
+    user_mem = mem + sizeof(*hdr);
 
-	strcpy(hdr->sig, "SAFEMEM");
-	strcpy(tail->sig, "SAFEMEM");
-	hdr->tail = tail;
-	hdr->alloc_sz = alloc_sz;
-	hdr->file = file;
-	hdr->line = line;
-	hdr->next = NULL;
+    strcpy(hdr->sig, "SAFEMEM");
+    strcpy(tail->sig, "SAFEMEM");
+    hdr->tail = tail;
+    hdr->alloc_sz = alloc_sz;
+    hdr->file = file;
+    hdr->line = line;
+    hdr->next = NULL;
 
-	if (safe_mem_hdr_first == NULL) {
-		safe_mem_hdr_first = hdr;
-	} else {
-		hdrp = safe_mem_hdr_first;
-		while (hdrp->next != NULL)
-			hdrp = hdrp->next;
-		hdr->prev = hdrp;
-		hdrp->next = hdr;
-	}
+    if (safe_mem_hdr_first == NULL) {
+        safe_mem_hdr_first = hdr;
+    } else {
+        hdrp = safe_mem_hdr_first;
+        while (hdrp->next != NULL)
+            hdrp = hdrp->next;
+        hdr->prev = hdrp;
+        hdrp->next = hdr;
+    }
 
-	return user_mem;
+    return user_mem;
 }
 
 void
 _free_safe_mem(void *mem_ptr, const char *file, int line)
 {
-	struct safe_mem_hdr *hdr;
-	struct safe_mem_tail *tail;
-	size_t alloc_sz;
-	char *mem = mem_ptr;
+    struct safe_mem_hdr *hdr;
+    struct safe_mem_tail *tail;
+    size_t alloc_sz;
+    char *mem = mem_ptr;
 
-	mem -= sizeof(*hdr);
-	hdr = (struct safe_mem_hdr *)mem;
-	tail = (struct safe_mem_tail *)(mem + hdr->alloc_sz - sizeof(*tail));
+    if (!mem_ptr) return;
 
-#ifdef DEBUG
-	fprintf(stderr, "freeing safe_mem (hdr): %#lx (%s:%d)\n",
-		    (unsigned long)(void *)hdr, hdr->file, hdr->line);
+    mem -= sizeof(*hdr);
+    hdr = (struct safe_mem_hdr *)mem;
+    tail = (struct safe_mem_tail *)(mem + hdr->alloc_sz - sizeof(*tail));
+
+#ifdef SAFE_MEM_REPORTING
+    if (hdr->line >= 0) {
+        fprintf(stderr, "freeing safe_mem (hdr): %#lx (%s:%d)\n",
+                (unsigned long)(void *)hdr, hdr->file, hdr->line);
+    }
 #endif
 
-	if (hdr->alloc_sz == 0) {
-		fprintf(stderr, "BUG: double-free at %s:%d !!!\n", file, line);
-		return;
-	}
+    if (hdr->alloc_sz == 0) {
+        fprintf(stderr, "BUG: double-free at %s:%d !!!\n", file, line);
+        return;
+    }
 
-	/* Integrity checks */
-	if ((memcmp(hdr->sig, "SAFEMEM\0", 8) != 0) ||
-	    (memcmp(tail->sig, "SAFEMEM\0", 8) != 0)) {
-		fprintf(stderr, "BUG: safe_mem buffer under- or overflow at "
-		    "%s:%d !!!\n", file, line);
-		return;
-	}
+    /* Integrity checks */
+    if ((memcmp(hdr->sig, "SAFEMEM\0", 8) != 0) ||
+        (memcmp(tail->sig, "SAFEMEM\0", 8) != 0)) {
+        fprintf(stderr, "BUG: safe_mem buffer under- or overflow at "
+            "%s:%d !!!\n", file, line);
+        return;
+    }
 
-	if (safe_mem_hdr_first == NULL) {
-		fprintf(stderr, "BUG: safe_mem list should not be empty at "
-		    "%s:%d !!!\n", file, line);
-		return;
-	}
+    if (safe_mem_hdr_first == NULL) {
+        fprintf(stderr, "BUG: safe_mem list should not be empty at "
+            "%s:%d !!!\n", file, line);
+        return;
+    }
 
-	if (hdr->prev != NULL)
-		hdr->prev->next = hdr->next;
-	if (hdr->next != NULL)
-		hdr->next->prev = hdr->prev;
-	if (safe_mem_hdr_first == hdr)
-		safe_mem_hdr_first = hdr->next;
+    if (hdr->prev != NULL)
+        hdr->prev->next = hdr->next;
+    if (hdr->next != NULL)
+        hdr->next->prev = hdr->prev;
+    if (safe_mem_hdr_first == hdr)
+        safe_mem_hdr_first = hdr->next;
 
-	alloc_sz = hdr->alloc_sz;
-	memset(mem, 0xFF, alloc_sz);
-	memset(mem, 0, alloc_sz);
+    alloc_sz = hdr->alloc_sz;
+    memset(mem, 0xFF, alloc_sz);
+    memset(mem, 0, alloc_sz);
 
-	free(mem);
+    free(mem);
 }
 
 void *
 _strdup_safe_mem(const char *in, const char *file, int line)
 {
-	char *out;
-	size_t sz;
+    char *out;
+    size_t sz;
 
-	sz = strlen(in)+1;
+    sz = strlen(in)+1;
 
-	if ((out = _alloc_safe_mem(sz, file, line)) == NULL) {
-		return NULL;
-	}
+    if ((out = _alloc_safe_mem(sz, file, line)) == NULL) {
+        return NULL;
+    }
 
-	memcpy(out, in, sz);
-	out[sz-1] = '\0';
+    memcpy(out, in, sz);
+    out[sz-1] = '\0';
 
-	return out;
+    return out;
 }
 
 void
 check_and_purge_safe_mem(void)
 {
-	struct safe_mem_hdr *hdr;
-	char *mem;
-#ifdef DEBUG
-	int ok;
+    struct safe_mem_hdr *hdr;
+    char *mem;
+#ifdef SAFE_MEM_REPORTING
+    int ok;
 #endif
 
-	if (safe_mem_hdr_first == NULL)
-		return;
+    if (safe_mem_hdr_first == NULL)
+        return;
 
-	hdr = safe_mem_hdr_first;
-	while ((hdr = safe_mem_hdr_first) != NULL) {
-#ifdef DEBUG
-		if ((hdr->alloc_sz > 0) &&
-		    (memcmp(hdr->sig, "SAFEMEM\0", 8) == 0) &&
-		    (memcmp(hdr->tail->sig, "SAFEMEM\0", 8) == 0))
-			ok = 1;
-		else
-			ok = 0;
+    hdr = safe_mem_hdr_first;
+    while ((hdr = safe_mem_hdr_first) != NULL) {
+#ifdef SAFE_MEM_REPORTING
+        if ((hdr->alloc_sz > 0) &&
+            (memcmp(hdr->sig, "SAFEMEM\0", 8) == 0) &&
+            (memcmp(hdr->tail->sig, "SAFEMEM\0", 8) == 0))
+            ok = 1;
+        else
+            ok = 0;
 
-		fprintf(stderr, "un-freed safe_mem: %#lx (%s:%d) [integrity=%s]\n",
-		    (unsigned long)(void *)hdr, hdr->file, hdr->line,
-		    ok? "ok" : "failed");
+        if (hdr->line >= 0) {
+            fprintf(stderr, "un-freed safe_mem: %#lx (%s:%d) [integrity=%s]\n",
+                (unsigned long)(void *)hdr, hdr->file, hdr->line,
+                ok? "ok" : "failed");
+        }
 #endif
-		mem = (void *)hdr;
-		mem += sizeof(*hdr);
-		_free_safe_mem(mem, "check_and_purge_safe_mem", 0);
-	}
+        mem = (void *)hdr;
+        mem += sizeof(*hdr);
+        _free_safe_mem(mem, "check_and_purge_safe_mem", 0);
+    }
 }
