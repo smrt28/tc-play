@@ -32,30 +32,64 @@
 
 #include "tcplay.h"
 
+#include "config.h"
+
+#ifdef HAVE_ARGON2
+#include "argon2-hash.h"
+#endif
+
+#ifdef DEBUG
+static void print_hex(unsigned char *buf, size_t len) {
+    size_t i;
+    for (i = 0; i < len; i++)
+        printf("%02x", buf[i]);
+
+    printf("\n");
+}
+#endif
+
 
 int
 pbkdf2(struct pbkdf_prf_algo *hash, const char *pass, int passlen,
     const unsigned char *salt, int saltlen,
     int keylen, unsigned char *out)
 {
-	const EVP_MD *md;
-	int r;
+#ifdef HAVE_ARGON2
+    if (strcmp(hash->name, "ARGON2") == 0) {
+        if (argon2(pass, passlen,
+                    salt, saltlen,
+                    out, keylen, hash->iteration_count) != 0) {
+            tc_log(1, "Error in ARGON2\n");
+            return EINVAL;
+        }
+#ifdef DEBUG
+        printf("ARGON2 derived key: ");
+        print_hex(out, keylen);
+#endif
+        return 0;
+    } else
+#endif
+    {
 
-	OpenSSL_add_all_algorithms();
+        const EVP_MD *md;
+        int r;
 
-	md = EVP_get_digestbyname(hash->name);
-	if (md == NULL) {
-		tc_log(1, "Hash %s not found\n", hash->name);
-		return ENOENT;
-	}
-	r = PKCS5_PBKDF2_HMAC(pass, passlen, salt, saltlen,
-	    hash->iteration_count, md, keylen, out);
+        OpenSSL_add_all_algorithms();
 
-	if (r == 0) {
-		tc_log(1, "Error in PBKDF2\n");
-		return EINVAL;
-	}
+        md = EVP_get_digestbyname(hash->name);
+        if (md == NULL) {
+            tc_log(1, "Hash %s not found\n", hash->name);
+            return ENOENT;
+        }
+        r = PKCS5_PBKDF2_HMAC(pass, passlen, salt, saltlen,
+                hash->iteration_count, md, keylen, out);
 
-	return 0;
+        if (r == 0) {
+            tc_log(1, "Error in PBKDF2\n");
+            return EINVAL;
+        }
+
+        return 0;
+    }
+    return EINVAL;
 }
-

@@ -86,6 +86,8 @@
 #endif
 
 
+#include "safe_mem.h"
+
 typedef uint64_t disksz_t;
 #define DISKSZ_FMT PRIu64
 
@@ -201,6 +203,7 @@ struct tcplay_opts {
 	int		hidden;
 	disksz_t	hidden_size_bytes;
 	int		secure_erase; /* XXX: default to 1! */
+    int with_backup;
 
 	/* Options for map, info_mapped */
 	const char	*map_name;
@@ -275,18 +278,15 @@ struct tchdr_enc *create_hdr(unsigned char *pass, int passlen,
     struct pbkdf_prf_algo *prf_algo, struct tc_cipher_chain *cipher_chain,
     size_t sec_sz, disksz_t total_blocks,
     off_t offset, disksz_t blocks, int hidden, int weak,
-    struct tchdr_enc **backup_hdr);
+    struct tchdr_enc **backup_hdr,
+    int with_backup);
 struct tchdr_dec *decrypt_hdr(struct tchdr_enc *ehdr,
     struct tc_cipher_chain *cipher_chain, unsigned char *key);
 int verify_hdr(struct tchdr_dec *hdr);
 struct tchdr_enc *copy_reencrypt_hdr(unsigned char *pass, int passlen,
     struct pbkdf_prf_algo *prf_algo, int weak, struct tcplay_info *info,
-    struct tchdr_enc **backup_hdr);
-
-void *_alloc_safe_mem(size_t req_sz, const char *file, int line);
-void *_strdup_safe_mem(const char *in, const char *file, int line);
-void _free_safe_mem(void *mem, const char *file, int line);
-void check_and_purge_safe_mem(void);
+    struct tchdr_enc **backup_hdr,
+    int with_backup);
 
 struct tc_crypto_algo *check_cipher(const char *cipher, int quiet);
 struct tc_cipher_chain *check_cipher_chain(const char *cipher_chain, int quiet);
@@ -322,24 +322,14 @@ extern summary_fn_t summary_fn;
 extern struct pbkdf_prf_algo pbkdf_prf_algos[];
 extern struct tc_cipher_chain *tc_cipher_chains[MAX_CIPHER_CHAINS];
 
+
+int tc_yb_hmac(int slot, unsigned char *pass, int passlen, unsigned char * hmac);
+
 #define STATE_UNKNOWN		0
 #define STATE_GET_RANDOM	1
 #define STATE_ERASE		2
 
 extern int tc_internal_state;
-#ifndef	__DECONST
-#define	__DECONST(type, var)	((type)(uintptr_t)(const void *)(var))
-#endif
-
-#define alloc_safe_mem(x) \
-	_alloc_safe_mem(x, __FILE__, __LINE__)
-
-#define strdup_safe_mem(x) \
-	_strdup_safe_mem(x, __FILE__, __LINE__)
-
-#define free_safe_mem(x) \
-	_free_safe_mem(__DECONST(void *, x), __FILE__, __LINE__)
-
 #define __unused       __attribute__((__unused__))
 
 #endif

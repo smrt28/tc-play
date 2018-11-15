@@ -40,18 +40,35 @@
 
 #include "tcplay.h"
 
+#include "config.h"
+
+#ifdef HAVE_ARGON2
+#include "argon2-hash.h"
+#endif
+
+#ifdef DEBUG
+static void print_hex(unsigned char *buf, size_t len) {
+    size_t i;
+    for (i = 0; i < len; i++)
+        printf("%02x", buf[i]);
+
+    printf("\n");
+}
+#endif
+
+
 static
 int
 get_gcrypt_hash_id(struct pbkdf_prf_algo *hash)
 {
-	if	(strcmp(hash->name, "RIPEMD160") == 0)
-		return GCRY_MD_RMD160;
-	else if (strcmp(hash->name, "SHA512") == 0)
-		return GCRY_MD_SHA512;
-	else if	(strcmp(hash->name, "whirlpool") == 0)
-		return GCRY_MD_WHIRLPOOL;
-	else
-		return -1;
+    if  (strcmp(hash->name, "RIPEMD160") == 0)
+        return GCRY_MD_RMD160;
+    else if (strcmp(hash->name, "SHA512") == 0)
+        return GCRY_MD_SHA512;
+    else if (strcmp(hash->name, "whirlpool") == 0)
+        return GCRY_MD_WHIRLPOOL;
+    else
+        return -1;
 }
 
 int
@@ -59,17 +76,34 @@ pbkdf2(struct pbkdf_prf_algo *hash, const char *pass, int passlen,
     const unsigned char *salt, int saltlen,
     int keylen, unsigned char *out)
 {
-	gpg_error_t err;
 
-	err = gcry_kdf_derive(pass, passlen, GCRY_KDF_PBKDF2,
-	    get_gcrypt_hash_id(hash),
-            salt, saltlen, hash->iteration_count, keylen, out);
+#ifdef HAVE_ARGON2
+    if (strcmp(hash->name, "ARGON2") == 0) {
+        if (argon2(pass, passlen,
+                    salt, saltlen,
+                    out, keylen, hash->iteration_count) != 0) {
+            tc_log(1, "Error in ARGON2\n");
+            return EINVAL;
+        }
+#ifdef DEBUG
+        printf("ARGON2 derived key: ");
+        print_hex(out, keylen);
+#endif
+        return 0;
+    } else
+#endif
+    {
+        gpg_error_t err;
+        err = gcry_kdf_derive(pass, passlen, GCRY_KDF_PBKDF2,
+            get_gcrypt_hash_id(hash),
+                salt, saltlen, hash->iteration_count, keylen, out);
+        if (err) {
+            tc_log(1, "Error in PBKDF2\n");
+            return EINVAL;
+        }
+        return 0;
+    }
 
-	if (err) {
-		tc_log(1, "Error in PBKDF2\n");
-		return EINVAL;
-	}
-
-	return 0;
+    return EINVAL;
 }
 
