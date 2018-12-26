@@ -20,6 +20,9 @@
 #define YKPIV_ENCRYPTED_SECRET_LEN 256
 
 
+#define YKPIV_SLOTS 21
+#define YKPIV_SLOTS_RANGE "[1-21]"
+
 #include <stdint.h>
 
 struct ykpiv_state;

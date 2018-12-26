@@ -27,6 +27,7 @@ int tc_ykpiv_select_slot(size_t n, uint8_t *key, int *object_id) {
         YKPIV_KEY_RETIRED13, YKPIV_KEY_RETIRED14, YKPIV_KEY_RETIRED15,
         YKPIV_KEY_RETIRED16, YKPIV_KEY_RETIRED17, YKPIV_KEY_RETIRED18,
         YKPIV_KEY_RETIRED19, YKPIV_KEY_RETIRED20,
+        YKPIV_KEY_AUTHENTICATION // 21
     };
 
     static int retired_objects[] = {
@@ -37,9 +38,10 @@ int tc_ykpiv_select_slot(size_t n, uint8_t *key, int *object_id) {
         YKPIV_OBJ_RETIRED13, YKPIV_OBJ_RETIRED14, YKPIV_OBJ_RETIRED15,
         YKPIV_OBJ_RETIRED16, YKPIV_OBJ_RETIRED17, YKPIV_OBJ_RETIRED18,
         YKPIV_OBJ_RETIRED19, YKPIV_OBJ_RETIRED20,
+        YKPIV_OBJ_AUTHENTICATION // 21
     };
 
-    if (n > 20 || n < 1) return -1;
+    if (n > YKPIV_SLOTS || n < 1) return -1;
     *key = retired_keys[n-1];
     *object_id = retired_objects[n-1];
     return 0;
@@ -116,7 +118,7 @@ static int _fetch_secret(struct ykpiv_state *state, int n,
     if (!secret) CERROR(ERR_YK_ALLOC, "Error allocating memory for secret");
 
     if (tc_ykpiv_select_slot(n, &slot, &object_id))
-        CERROR(ERR_YK_ARGS, "Invalid slot number [1-20]");
+        CERROR(ERR_YK_ARGS, "Invalid slot number " YKPIV_SLOTS_RANGE);
 
     if (ykpiv_fetch_object(state, object_id, data, &len) != YKPIV_OK)
         CERROR(ERR_YK_NOTSET, "Can't fetch secret from Yubikey object 0x%x", object_id);

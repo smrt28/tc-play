@@ -45,7 +45,8 @@ static int _generate_key(int n, struct ykpiv_state *state,
     BIGNUM *bignum_n = NULL, *bignum_e = NULL;
 
     if (tc_ykpiv_select_slot(n, &slot, &object_id))
-        CERROR(ERR_YK_ARGS, "Invalid slot number [1-20]");
+        CERROR(ERR_YK_ARGS, "Invalid slot number "
+                YKPIV_SLOTS_RANGE);
 
     if (ykpiv_util_generate_key(state,
             slot, YKPIV_ALGO_RSA2048,
@@ -214,9 +215,10 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (o.slot < 1 || o.slot > 20) {
+    if (o.slot < 1 || o.slot > YKPIV_SLOTS) {
         CERROR(ERR_YK_ARGS,
-                "yubico-tc-init: slot must be a number in range [1-20]");
+                "yubico-tc-init: slot must be a number in range "
+                YKPIV_SLOTS_RANGE);
     }
 
     if (!o.action) {

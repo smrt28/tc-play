@@ -6,6 +6,7 @@
 #include "config.h"
 #include "yubico/error.h"
 #include "yubico/tc-common.h"
+#include "yubico/piv.h"
 
 static int is_number(const char *s) {
     if (!s || !*s) return 0;
@@ -66,7 +67,7 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk) {
         return 0;
     }
 
-    if (type == YUBIKEY_METHOD_PIV && (slot < 1 || slot > 20)) {
+    if (type == YUBIKEY_METHOD_PIV && (slot < 1 || slot > YKPIV_SLOTS)) {
         return 0;
     }
 
