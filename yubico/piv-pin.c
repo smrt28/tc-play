@@ -35,7 +35,7 @@ static int read_passphrase(const char *prompt, char *pass, size_t bufsz)
 
     memset(pass, 0, bufsz);
 
-    printf("%s", prompt);
+    fprintf(stderr, "%s", prompt);
     fflush(stdout);
 
     /* If input is being provided by something which is not a terminal, don't
@@ -64,7 +64,7 @@ static int read_passphrase(const char *prompt, char *pass, size_t bufsz)
 
     if (is_tty) {
         tcsetattr(fd, TCSAFLUSH, &termios_old);
-        putchar('\n');
+        fputc('\n', stderr);
 
         sigaction(SIGINT, &old_act, NULL);
     }
