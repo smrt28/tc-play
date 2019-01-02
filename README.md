@@ -42,9 +42,12 @@ signature and we need the secret obtained from the Yubikey to be deterministic.
 So the solution is based on decipher operation.
 
 The secret derivation steps:
+----------------------------
 
 Before using the Yubikey you have to set up a PIV slot with an RSA2048 key
-which Yubikey will use for generating the secret.
+which Yubikey will use for generating the secret. For instance:
+
+    yubico-piv-tool -a generate -s 82
 
 First, PBKF2 derives a chunk of 256 bytes (2048 bits) from the password. PBKF2
 is not used for security purpose there; its role is a hash function of
