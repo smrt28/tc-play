@@ -41,8 +41,9 @@ Sign operation can't be used since it adds random padding to the resulting
 signature and we need the secret obtained from the Yubikey to be deterministic.
 So the solution is based on decipher operation.
 
-The secret derivation steps:
-----------------------------
+
+The secret derivation
+---------------------
 
 Before using the Yubikey you have to set up a PIV slot with an RSA2048 key
 which Yubikey will use for generating the secret. For instance:
@@ -63,6 +64,16 @@ This approach ensures the secret would be calculated from the RSA private key
 which is hidden within the Yubikey PIV slot by deciphering operation which is
 PIN protected. The any size secret is obtained from the RSA 256bit result by
 PBKF2 hashing.
+
+
+yubico-keyfile
+--------------
+
+The tc-play uses Yubikey secret to derive header-key in the same way as
+TrueCrypt/tc-play derives header-key from keyfiles. The "yubico-keyfile"
+utility can obtain the secret from the Yubikey for you and store it in the
+file. You can use this file as a backup. It would work as a keyfile as well as
+your Yubikey.
 
 
 Implementation notes
