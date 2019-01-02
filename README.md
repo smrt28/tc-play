@@ -20,6 +20,47 @@ As it turns out, most technical documents on TrueCrypt contain mistakes, hence
 the trial and error approach.
 
 
+Yubikey
+==========
+The goal is to use Yubico stick as a PIN-protected secret provider and use the
+secret as a part of the TrueCrypt encryption key.
+
+It seems there is no way to store arbitrary PIN protected secret on the Yubikey
+by a proper way. Yubikey has just five data slots which are supposed to be
+holding PIN protected data. Any of those slots are not supposed to carry this
+type of data. This tc-play version is a workaround implementation.
+
+Yubico PIV allows storing RSA2048 keys in several slots. An exact number of the
+slots varies on the Yubikey version. There should be about 24 slots available
+for this purpose on Yubikey 4 and Yubikey 5. It seems there are just four slots
+available on Yubikey NEO. The slots are write-only, the RSA key imported into
+the slot can't be read back. The key in Yubikey PIV can be used for decrypting
+and signing only, and all those operations are PIN protected which I use.
+
+Sign operation can't be used since it adds random padding to the resulting
+signature and we need the secret obtained from the Yubikey to be deterministic.
+So the solution is based on decipher operation.
+
+The secret derivation steps:
+
+Before using the Yubikey you have to set up a PIV slot with an RSA2048 key
+which Yubikey will use for generating the secret.
+
+First, PBKF2 derives a chunk of 256 bytes (2048 bits) from the password. PBKF2
+is not used for security purpose there; its role is a hash function of
+arbitrary output size only. It uses just a single iteration. The very first
+chunk bit is set to 0 explicitly to ensure that the represented number, is
+lower then RSA2048 modulus.
+
+The chunk is passed to the given Yubico slot decipher function which returns
+the result of RSA formula c^d mod m where d is private. PBKF2 derives the
+result secret.
+
+This approach ensures the secret would be calculated from the RSA private key
+which is hidden within the Yubikey PIV slot by deciphering operation which is
+PIN protected. The any size secret is obtained from the RSA 256bit result by
+PBKF2 hashing.
+
 
 Implementation notes
 ==========
