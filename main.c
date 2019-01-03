@@ -235,8 +235,8 @@ static struct option longopts[] = {
     { "weak-keys",      no_argument,        NULL, 'w' },
     { "insecure-erase", no_argument,        NULL, 'z' },
     { "with-hdr-backup", no_argument,       NULL, 'B' },
-    { "help",       no_argument,        NULL, 'h' },
-    { "no-password", no_argument            NULL, FLAG_LONG_NO_PASSWORD },
+    { "help",       no_argument,            NULL, 'h' },
+    { "no-password",  no_argument,          NULL, FLAG_LONG_NO_PASSWORD },
     { NULL,         0,          NULL, 0   },
 };
 
@@ -425,7 +425,7 @@ main(int argc, char *argv[])
             _set_str_opt(hdr_file_out);
             break;
         case FLAG_LONG_NO_PASSWORD:
-            opts->flags |= TC_FLAG_NO_PASSWORD;
+            opts->flags |= TC_FLAG_NO_PASSWORD; 
             break;
         case 'h':
         case '?':
