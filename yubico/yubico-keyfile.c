@@ -112,18 +112,71 @@ static int self_test() {
     return 0;
 }
 
-int main(int argc, char **argv) {
-    int option_index = 0;
-    int c, rv = 0, len;
-
-
-    const char *keyfile = NULL;
+int handle_piv(const char *pin, struct tc_yubico_key *key, const char *keyfile, char *errmsg) {
+    int rv = 0;
     unsigned char *secret = NULL;
     int fd = -1;
-    const char *pin = NULL;
     char *pinbuf = NULL;
-    char errmsg[ERR_MESSAGE_LEN];
+    int len;
     unsigned char *pass = NULL;
+
+    secret = alloc_safe_mem(YKPIV_SECRET_LEN);
+    if (!secret) CERROR(ERR_YK_GENERAL, "Can't allocate memory for secret!");
+    memset(secret, 0, YKPIV_SECRET_LEN);
+
+    len = 0;
+    if (!pin) {
+        pinbuf = alloc_safe_mem(YKPIV_PIN_BUF_SIZE);
+        if (!pinbuf) CERROR(ERR_YK_GENERAL, "Can't allocate memory for bin buffer!");
+        memset(pinbuf, 0, YKPIV_PIN_BUF_SIZE);
+
+        if ((rv = tc_ykpiv_getpin(pinbuf, errmsg)) != 0) goto err; 
+        pin = pinbuf;
+    }
+
+    pass = alloc_safe_mem(MAX_PASSSZ);
+    if (!pass) CERROR(ERR_YK_GENERAL, "can't allocate memory");
+    memset(pass, 0, MAX_PASSSZ);
+
+    if (key->secret_len > 0) {
+        memcpy(pass, key->secret, key->secret_len);
+    } else {
+        char *pw = getpass("Password:");
+        len = strlen(pw);
+        if (len > 64) len = 64;
+        memcpy(pass, pw, len);
+    }
+
+    rv = tc_ykpiv_fetch_secret(key->slot, pin, secret,
+            YKPIV_SECRET_LEN, pass, MAX_PASSSZ, errmsg);
+    if (rv != 0) goto err;
+
+    print_hex(secret, YKPIV_SECRET_LEN);
+    if (keyfile) {
+        fd = open(keyfile, O_CREAT | O_WRONLY, 0644);
+        if (fd < 0) {
+            CERROR(ERR_YK_ARGS, "Can't open keyfile!");
+        }
+        if (write(fd, secret, YKPIV_SECRET_LEN) != YKPIV_SECRET_LEN) {
+            CERROR(ERR_YK_ARGS, "Can't write keyfile!");
+        }
+    }
+
+err:
+    free_safe_mem(secret);
+    free_safe_mem(pinbuf);
+    free_safe_mem(pass);
+    if (fd >= 0) close(fd);
+
+    return rv;
+}
+
+int main(int argc, char **argv) {
+    int option_index = 0;
+    int c, rv = 0;
+    const char *keyfile = NULL;
+    const char *pin = NULL;
+    char errmsg[ERR_MESSAGE_LEN];
     struct tc_yubico_key key;
 
     if (argc == 1) {
@@ -176,64 +229,19 @@ int main(int argc, char **argv) {
         fprintf(stderr, "WARNING: can't enable memory global mlock!\n");
     }
 
-    secret = alloc_safe_mem(YKPIV_SECRET_LEN);
-    if (!secret) CERROR(ERR_YK_GENERAL, "Can't allocate memory for secret!");
-    memset(secret, 0, YKPIV_SECRET_LEN);
-
-    len = 0;
-    if (!pin) {
-        pinbuf = alloc_safe_mem(YKPIV_PIN_BUF_SIZE);
-        if (!pinbuf) CERROR(ERR_YK_GENERAL, "Can't allocate memory for bin buffer!");
-        memset(pinbuf, 0, YKPIV_PIN_BUF_SIZE);
-
-        if ((rv = tc_ykpiv_getpin(pinbuf, errmsg)) != 0) goto err; 
-        pin = pinbuf;
-    }
-
-    pass = alloc_safe_mem(MAX_PASSSZ);
-    if (!pass) CERROR(ERR_YK_GENERAL, "can't allocate memory");
-    memset(pass, 0, MAX_PASSSZ);
-
-    if (key.secret_len > 0) {
-        memcpy(pass, key.secret, key.secret_len);
-    } else {
-        char *pw = getpass("Password:");
-        len = strlen(pw);
-        if (len > 64) len = 64;
-        memcpy(pass, pw, len);
-    }
-
     switch(key.type) {
         case YUBIKEY_METHOD_PIV:
-            rv = tc_ykpiv_fetch_secret(key.slot, pin, secret,
-                    YKPIV_SECRET_LEN, pass, MAX_PASSSZ, errmsg);
-            if (rv != 0) goto err;
+            rv = handle_piv(pin, &key, keyfile, errmsg);
             break;
         default:
             CERROR(ERR_YK_ARGS, "not implemented for the yubikey path");
             break;
     }
 
-    print_hex(secret, YKPIV_SECRET_LEN);
-    if (keyfile) {
-        fd = open(keyfile, O_CREAT | O_WRONLY, 0644);
-        if (fd < 0) {
-            CERROR(ERR_YK_ARGS, "Can't open keyfile!");
-        }
-        if (write(fd, secret, YKPIV_SECRET_LEN) != YKPIV_SECRET_LEN) {
-            CERROR(ERR_YK_ARGS, "Can't write keyfile!");
-        }
-    }
-
 err:
     if (rv) {
         fprintf(stderr, "error: %s; [error-code=%d]\n", errmsg, rv);
     }
-
-    free_safe_mem(secret);
-    free_safe_mem(pinbuf);
-    free_safe_mem(pass);
-    if (fd >= 0) close(fd);
 
     check_and_purge_safe_mem();
     return rv;
