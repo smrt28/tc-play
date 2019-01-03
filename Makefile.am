@@ -13,9 +13,6 @@ if ENABLE_TC_YUBICO_DEBUG
 CFLAGS+= -DTC_YK_DEBUG
 endif
 
-CRYPTOS=pbkdf2-gcrypt.c
-
-
 TCPLAY_LIBS= @TCPLAY_DEPS_LIBS@
 TCPLAY_EXTRACFLAGS= @TCPLAY_DEPS_CFLAGS@
 YUBICO_SOURCE=
@@ -53,6 +50,6 @@ tcplay_CFLAGS = -DMAJ_VER=2 -DMIN_VER=0 -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 
 tcplay_SOURCES = \
 	tcplay.c crc32.c safe_mem.c io.c hdr.c humanize.c \
-	crypto.c crypto-gcrypt.c main.c generic_xts.c $(CRYPTOS) $(YUBICO_SOURCE) $(ARGON2_SOURCE)
+	crypto.c crypto-gcrypt.c main.c generic_xts.c pbkdf2-gcrypt.c $(YUBICO_SOURCE) $(ARGON2_SOURCE)
 
 tcplay_LDADD = $(TCPLAY_LIBS)

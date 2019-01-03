@@ -172,27 +172,18 @@ int main(int argc, char **argv) {
         fprintf(stderr, "WARNING: can't enable memory global mlock!\n");
     }
 
-    pinbuf = alloc_safe_mem(YKPIV_PIN_BUF_SIZE);
-
-    if (!pinbuf) CERROR(ERR_YK_GENERAL, "Can't allocate memory for bin buffer!");
-
-    memset(pinbuf, 0, YKPIV_PIN_BUF_SIZE);
     secret = alloc_safe_mem(YKPIV_SECRET_LEN);
     if (!secret) CERROR(ERR_YK_GENERAL, "Can't allocate memory for secret!");
-
     memset(secret, 0, YKPIV_SECRET_LEN);
 
     len = 0;
     if (!pin) {
-        if (tc_ykpiv_getpin(pinbuf) != 0) {
-            CERROR(ERR_YK_ARGS, "PIN must be 6-8 characters long!");
-        }
+        pinbuf = alloc_safe_mem(YKPIV_PIN_BUF_SIZE);
+        if (!pinbuf) CERROR(ERR_YK_GENERAL, "Can't allocate memory for bin buffer!");
+        memset(pinbuf, 0, YKPIV_PIN_BUF_SIZE);
+
+        if ((rv = tc_ykpiv_getpin(pinbuf, errmsg)) != 0) goto err; 
         pin = pinbuf;
-    } else {
-        len = strlen(pin);
-        if (len < YKPIV_PIN_MIN_SIZE || len > YKPIV_PIN_MAX_SIZE) {
-            CERROR(ERR_YK_ARGS, "PIN must be 6-8 characters long!");
-        }
     }
 
     pass = alloc_safe_mem(MAX_PASSSZ);

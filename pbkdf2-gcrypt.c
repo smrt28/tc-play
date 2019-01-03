@@ -46,17 +46,6 @@
 #include "argon2-hash.h"
 #endif
 
-#ifdef DEBUG
-static void print_hex(unsigned char *buf, size_t len) {
-    size_t i;
-    for (i = 0; i < len; i++)
-        printf("%02x", buf[i]);
-
-    printf("\n");
-}
-#endif
-
-
 static
 int
 get_gcrypt_hash_id(struct pbkdf_prf_algo *hash)
@@ -85,10 +74,6 @@ pbkdf2(struct pbkdf_prf_algo *hash, const char *pass, int passlen,
             tc_log(1, "Error in ARGON2\n");
             return EINVAL;
         }
-#ifdef DEBUG
-        printf("ARGON2 derived key: ");
-        print_hex(out, keylen);
-#endif
         return 0;
     } else
 #endif

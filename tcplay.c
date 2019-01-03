@@ -452,12 +452,16 @@ process_hdr(const char *dev, int flags, unsigned char *pass, int passlen,
 
         /* Start search for correct algorithm combination */
         found = 0;
+
+#ifdef DEBUG
+        printf("processing header; Salt: ");
+        print_hex(ehdr->salt, 0, sizeof(ehdr->salt));
+#endif
+
         for (i = 0; !found && pbkdf_prf_algos[i].name != NULL; i++) {
 #ifdef DEBUG
                 printf("\nTrying PRF algo %s (%d)\n", pbkdf_prf_algos[i].name,
                         pbkdf_prf_algos[i].iteration_count);
-                printf("Salt: ");
-                print_hex(ehdr->salt, 0, sizeof(ehdr->salt));
 #endif
                 error = pbkdf2(&pbkdf_prf_algos[i], (char *)pass, passlen,
                         ehdr->salt, sizeof(ehdr->salt),
@@ -852,248 +856,214 @@ out:
 struct tcplay_info *
 info_map_common(struct tcplay_opts *opts, char *passphrase_out)
 {
-        struct tchdr_enc *ehdr, *hehdr = NULL;
-        struct tcplay_info *info, *hinfo = NULL;
-        char *pass;
-        char *h_pass;
+        struct tchdr_enc *ehdr = NULL, *hehdr = NULL;
+        struct tcplay_info *info = NULL, *hinfo = NULL;
+        char *pass = NULL;
+        char *h_pass = NULL;
         int error, error2 = 0;
         size_t sz;
         size_t blksz;
         disksz_t blocks;
         int is_hidden = 0;
         int try_empty = 0;
-        int retries;
 
         if ((error = get_disk_info(opts->dev, &blocks, &blksz)) != 0) {
                 tc_log(1, "could not get disk information\n");
                 return NULL;
         }
 
-        if (opts->retries < 1)
-                retries = 1;
-        else
-                retries = opts->retries;
-
-        /*
-         * Add one retry so we can do a first try without asking for
-         * a password if keyfiles are passed in.
-         */
-        if (opts->interactive && (opts->nkeyfiles > 0)) {
-            int i;
-            try_empty = 1;
-            for (i = 0; i < opts->nkeyfiles; i++) {
-                if (opts->keyfiles[i][0] == '/' && opts->keyfiles[i][1] == '/') {
-                    try_empty = 0;
-                    break;
-                }
-            }
-            ++retries;
+        if ((pass = alloc_safe_mem(PASS_BUFSZ)) == NULL) {
+                tc_log(1, "could not allocate safe passphrase memory\n");
+                goto out;
         }
 
-        info = NULL;
+        if (TC_FLAG_SET(opts->flags, NO_PASSWORD)) {
+            try_empty = 1;
+        }
 
-        ehdr = NULL;
-        pass = h_pass = NULL;
+        if (try_empty) {
+                pass[0] = '\0';
+        } else if (opts->interactive) {
+                        if ((error = read_passphrase("Passphrase: ", pass,
+                        MAX_PASSSZ, PASS_BUFSZ, opts->timeout))) {
+                        tc_log(1, "could not read passphrase\n");
+                        /* XXX: handle timeout differently? */
+                        goto out;
+                }
+                pass[MAX_PASSSZ] = '\0';
+        } else {
+                /* In batch mode, use provided passphrase */
+                if (opts->passphrase != NULL) {
+                        strncpy(pass, opts->passphrase, MAX_PASSSZ);
+                        pass[MAX_PASSSZ] = '\0';
+                }
+        }
 
-        while ((info == NULL) && retries-- > 0)
-        {
-                pass = h_pass = NULL;
-                ehdr = hehdr = NULL;
-                info = hinfo = NULL;
+        if (passphrase_out != NULL) {
+                strcpy(passphrase_out, pass);
+        }
 
-                if ((pass = alloc_safe_mem(PASS_BUFSZ)) == NULL) {
+        if (opts->nkeyfiles > 0) {
+                /* Apply keyfiles to 'pass' */
+                if ((error = apply_keyfiles((unsigned char *)pass, PASS_BUFSZ,
+                        opts->keyfiles, opts->nkeyfiles))) {
+                        tc_log(1, "could not apply keyfiles\n");
+                        goto out;
+                }
+        }
+
+        if (opts->protect_hidden) {
+                if ((h_pass = alloc_safe_mem(PASS_BUFSZ)) == NULL) {
                         tc_log(1, "could not allocate safe passphrase memory\n");
                         goto out;
                 }
 
-                if (try_empty) {
-                        pass[0] = '\0';
-                } else if (opts->interactive) {
-                                if ((error = read_passphrase("Passphrase: ", pass,
+                if (opts->interactive) {
+                                if ((error = read_passphrase(
+                                "Passphrase for hidden volume: ", h_pass,
                                 MAX_PASSSZ, PASS_BUFSZ, opts->timeout))) {
                                 tc_log(1, "could not read passphrase\n");
-                                /* XXX: handle timeout differently? */
                                 goto out;
                         }
-                        pass[MAX_PASSSZ] = '\0';
+                        h_pass[MAX_PASSSZ] = '\0';
                 } else {
                         /* In batch mode, use provided passphrase */
-                        if (opts->passphrase != NULL) {
-                                strncpy(pass, opts->passphrase, MAX_PASSSZ);
-                                pass[MAX_PASSSZ] = '\0';
-                        }
-                }
-
-                if (passphrase_out != NULL) {
-                        strcpy(passphrase_out, pass);
-                }
-
-                if (opts->nkeyfiles > 0) {
-                        /* Apply keyfiles to 'pass' */
-                        if ((error = apply_keyfiles((unsigned char *)pass, PASS_BUFSZ,
-                                opts->keyfiles, opts->nkeyfiles))) {
-                                tc_log(1, "could not apply keyfiles\n");
-                                goto out;
-                        }
-                }
-
-                if (opts->protect_hidden) {
-                        if ((h_pass = alloc_safe_mem(PASS_BUFSZ)) == NULL) {
-                                tc_log(1, "could not allocate safe passphrase memory\n");
-                                goto out;
-                        }
-
-                        if (opts->interactive) {
-                                        if ((error = read_passphrase(
-                                        "Passphrase for hidden volume: ", h_pass,
-                                        MAX_PASSSZ, PASS_BUFSZ, opts->timeout))) {
-                                        tc_log(1, "could not read passphrase\n");
-                                        goto out;
-                                }
+                        if (opts->h_passphrase != NULL) {
+                                strncpy(h_pass, opts->h_passphrase, MAX_PASSSZ);
                                 h_pass[MAX_PASSSZ] = '\0';
-                        } else {
-                                /* In batch mode, use provided passphrase */
-                                if (opts->h_passphrase != NULL) {
-                                        strncpy(h_pass, opts->h_passphrase, MAX_PASSSZ);
-                                        h_pass[MAX_PASSSZ] = '\0';
-                                }
-                        }
-
-                        if (opts->n_hkeyfiles > 0) {
-                                /* Apply keyfiles to 'pass' */
-                                if ((error = apply_keyfiles((unsigned char *)h_pass, PASS_BUFSZ,
-                                        opts->h_keyfiles, opts->n_hkeyfiles))) {
-                                        tc_log(1, "could not apply keyfiles");
-                                        goto out;
-                                }
                         }
                 }
 
+                if (opts->n_hkeyfiles > 0) {
+                        /* Apply keyfiles to 'pass' */
+                        if ((error = apply_keyfiles((unsigned char *)h_pass, PASS_BUFSZ,
+                                opts->h_keyfiles, opts->n_hkeyfiles))) {
+                                tc_log(1, "could not apply keyfiles");
+                                goto out;
+                        }
+                }
+        }
+
+        /* Always read blksz-sized chunks */
+        sz = blksz;
+
+        if (TC_FLAG_SET(opts->flags, HDR_FROM_FILE)) {
+                ehdr = (struct tchdr_enc *)read_to_safe_mem(
+                        opts->hdr_file_in, 0, &sz);
+                if (ehdr == NULL) {
+                        tc_log(1, "error read hdr_enc: %s", opts->hdr_file_in);
+                        goto out;
+                }
+        } else {
+                ehdr = (struct tchdr_enc *)read_to_safe_mem(
+                        (TC_FLAG_SET(opts->flags, SYS)) ? opts->sys_dev : opts->dev,
+                        (TC_FLAG_SET(opts->flags, SYS) || TC_FLAG_SET(opts->flags, FDE)) ?
+                        HDR_OFFSET_SYS :
+                        (!TC_FLAG_SET(opts->flags, BACKUP)) ? 0 : -BACKUP_HDR_OFFSET_END,
+                        &sz);
+                if (ehdr == NULL) {
+                        tc_log(1, "error read hdr_enc: %s", opts->dev);
+                        goto out;
+                }
+        }
+
+        if (!TC_FLAG_SET(opts->flags, SYS)) {
                 /* Always read blksz-sized chunks */
                 sz = blksz;
 
-                if (TC_FLAG_SET(opts->flags, HDR_FROM_FILE)) {
-                        ehdr = (struct tchdr_enc *)read_to_safe_mem(
-                                opts->hdr_file_in, 0, &sz);
-                        if (ehdr == NULL) {
-                                tc_log(1, "error read hdr_enc: %s", opts->hdr_file_in);
+                if (TC_FLAG_SET(opts->flags, H_HDR_FROM_FILE)) {
+                        hehdr = (struct tchdr_enc *)read_to_safe_mem(
+                                opts->h_hdr_file_in, 0, &sz);
+                        if (hehdr == NULL) {
+                                tc_log(1, "error read hdr_enc: %s", opts->h_hdr_file_in);
                                 goto out;
                         }
                 } else {
-                        ehdr = (struct tchdr_enc *)read_to_safe_mem(
-                                (TC_FLAG_SET(opts->flags, SYS)) ? opts->sys_dev : opts->dev,
-                                (TC_FLAG_SET(opts->flags, SYS) || TC_FLAG_SET(opts->flags, FDE)) ?
-                                HDR_OFFSET_SYS :
-                                (!TC_FLAG_SET(opts->flags, BACKUP)) ? 0 : -BACKUP_HDR_OFFSET_END,
-                                &sz);
-                        if (ehdr == NULL) {
+                        hehdr = (struct tchdr_enc *)read_to_safe_mem(opts->dev,
+                                (!TC_FLAG_SET(opts->flags, BACKUP)) ? HDR_OFFSET_HIDDEN :
+                                -BACKUP_HDR_HIDDEN_OFFSET_END, &sz);
+                        if (hehdr == NULL) {
                                 tc_log(1, "error read hdr_enc: %s", opts->dev);
                                 goto out;
                         }
                 }
+        } else {
+                hehdr = NULL;
+        }
 
-                if (!TC_FLAG_SET(opts->flags, SYS)) {
-                        /* Always read blksz-sized chunks */
-                        sz = blksz;
+        error = process_hdr(opts->dev, opts->flags, (unsigned char *)pass,
+                (opts->nkeyfiles > 0)?MAX_PASSSZ:strlen(pass),
+                ehdr, &info);
 
-                        if (TC_FLAG_SET(opts->flags, H_HDR_FROM_FILE)) {
-                                hehdr = (struct tchdr_enc *)read_to_safe_mem(
-                                        opts->h_hdr_file_in, 0, &sz);
-                                if (hehdr == NULL) {
-                                        tc_log(1, "error read hdr_enc: %s", opts->h_hdr_file_in);
-                                        goto out;
-                                }
-                        } else {
-                                hehdr = (struct tchdr_enc *)read_to_safe_mem(opts->dev,
-                                        (!TC_FLAG_SET(opts->flags, BACKUP)) ? HDR_OFFSET_HIDDEN :
-                                        -BACKUP_HDR_HIDDEN_OFFSET_END, &sz);
-                                if (hehdr == NULL) {
-                                        tc_log(1, "error read hdr_enc: %s", opts->dev);
-                                        goto out;
-                                }
-                        }
-                } else {
+        /*
+         * Try to process hidden header if we have to protect the hidden
+         * volume, or the decryption/verification of the main header
+         * failed.
+         */
+        if (hehdr && (error || opts->protect_hidden)) {
+                if (error) {
+                        error2 = process_hdr(opts->dev, opts->flags, (unsigned char *)pass,
+                                (opts->nkeyfiles > 0)?MAX_PASSSZ:strlen(pass), hehdr,
+                                &info);
+                        is_hidden = !error2;
+                } else if (opts->protect_hidden) {
+                        error2 = process_hdr(opts->dev, opts->flags, (unsigned char *)h_pass,
+                                (opts->n_hkeyfiles > 0)?MAX_PASSSZ:strlen(h_pass), hehdr,
+                                &hinfo);
+                }
+        }
+
+        /* We need both to protect a hidden volume */
+        if ((opts->protect_hidden && (error || error2)) ||
+                (error && error2)) {
+                if (!try_empty)
+                        tc_log(1, "Incorrect password or not a TrueCrypt volume\n");
+
+                if (info) {
+                        free_info(info);
+                        info = NULL;
+                }
+                if (hinfo) {
+                        free_info(hinfo);
+                        hinfo = NULL;
+                }
+
+                /* Try again (or finish) */
+                free_safe_mem(pass);
+                pass = NULL;
+
+                if (h_pass) {
+                        free_safe_mem(h_pass);
+                        h_pass = NULL;
+                }
+                if (ehdr) {
+                        free_safe_mem(ehdr);
+                        ehdr = NULL;
+                }
+                if (hehdr) {
+                        free_safe_mem(hehdr);
                         hehdr = NULL;
                 }
+        }
 
-                error = process_hdr(opts->dev, opts->flags, (unsigned char *)pass,
-                        (opts->nkeyfiles > 0)?MAX_PASSSZ:strlen(pass),
-                        ehdr, &info);
-
-                /*
-                 * Try to process hidden header if we have to protect the hidden
-                 * volume, or the decryption/verification of the main header
-                 * failed.
-                 */
-                if (hehdr && (error || opts->protect_hidden)) {
-                        if (error) {
-                                error2 = process_hdr(opts->dev, opts->flags, (unsigned char *)pass,
-                                        (opts->nkeyfiles > 0)?MAX_PASSSZ:strlen(pass), hehdr,
-                                        &info);
-                                is_hidden = !error2;
-                        } else if (opts->protect_hidden) {
-                                error2 = process_hdr(opts->dev, opts->flags, (unsigned char *)h_pass,
-                                        (opts->n_hkeyfiles > 0)?MAX_PASSSZ:strlen(h_pass), hehdr,
-                                        &hinfo);
-                        }
-                }
-
-                /* We need both to protect a hidden volume */
-                if ((opts->protect_hidden && (error || error2)) ||
-                        (error && error2)) {
-                        if (!try_empty)
-                                tc_log(1, "Incorrect password or not a TrueCrypt volume\n");
-
-                        if (info) {
+        if (opts->protect_hidden) {
+                if (adjust_info(info, hinfo) != 0) {
+                        tc_log(1, "Could not protect hidden volume\n");
+                        if (info)
                                 free_info(info);
-                                info = NULL;
-                        }
-                        if (hinfo) {
+                        info = NULL;
+
+                        if (hinfo)
                                 free_info(hinfo);
-                                hinfo = NULL;
-                        }
+                        hinfo = NULL;
 
-                        /* Try again (or finish) */
-                        free_safe_mem(pass);
-                        pass = NULL;
-
-                        if (h_pass) {
-                                free_safe_mem(h_pass);
-                                h_pass = NULL;
-                        }
-                        if (ehdr) {
-                                free_safe_mem(ehdr);
-                                ehdr = NULL;
-                        }
-                        if (hehdr) {
-                                free_safe_mem(hehdr);
-                                hehdr = NULL;
-                        }
-
-                        try_empty = 0;
-                        continue;
+                        goto out;
                 }
 
-                if (opts->protect_hidden) {
-                        if (adjust_info(info, hinfo) != 0) {
-                                tc_log(1, "Could not protect hidden volume\n");
-                                if (info)
-                                        free_info(info);
-                                info = NULL;
-
-                                if (hinfo)
-                                        free_info(hinfo);
-                                hinfo = NULL;
-
-                                goto out;
-                        }
-
-                        if (hinfo) {
-                                free_info(hinfo);
-                                hinfo = NULL;
-                        }
+                if (hinfo) {
+                        free_info(hinfo);
+                        hinfo = NULL;
                 }
-                try_empty = 0;
         }
 
 out:
@@ -1755,10 +1725,6 @@ dm_setup(const char *mapname, struct tcplay_info *info)
                 else
                         sprintf(map, "%s.%d", mapname, j);
 
-#ifdef DEBUG
-                printf("Map[%d]: %s\n", __LINE__, map);
-#endif
-
 
                 if ((dm_task_set_name(dmt, map)) == 0) {
                         tc_log(1, "dm_task_set_name failed\n");
@@ -2087,7 +2053,6 @@ struct tcplay_opts *opts_init(void)
 
         memset(opts, 0, sizeof(*opts));
 
-        opts->retries = DEFAULT_RETRIES;
         opts->secure_erase = 1;
         opts->with_backup = 0;
 

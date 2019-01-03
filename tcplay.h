@@ -73,6 +73,7 @@
 #define TC_FLAG_SAVE_TO_FILE	0x0020
 #define TC_FLAG_HDR_FROM_FILE	0x0040
 #define TC_FLAG_H_HDR_FROM_FILE	0x0080
+#define TC_FLAG_NO_PASSWORD 	0x0100
 
 #define TC_FLAG_SET(f, x)	((f & TC_FLAG_##x) == TC_FLAG_##x)
 
@@ -212,7 +213,6 @@ struct tcplay_opts {
 	int		flags;
 	const char	*sys_dev;
 	int		protect_hidden;
-	int		retries;	/* XXX: default to DEFAULT_RETRIES */
 	time_t		timeout;
 
 	const char	*hdr_file_in;

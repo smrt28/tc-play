@@ -298,8 +298,8 @@ apply_keyfiles(unsigned char *pass, size_t pass_memsz, const char *keyfiles[],
                     kdata_sz = YKPIV_SECRET_LEN;
                 }
 
-                if (tc_ykpiv_getpin(ykpin) != 0) {
-                    tc_log(1, "error: invalid PIN length! Must be 6-8 characters long.\n");
+                if (tc_ykpiv_getpin(ykpin, errmsg) != 0) {
+                    tc_log(1, "error: %s", errmsg);
                     rv = EIO; goto err;
                 }
 

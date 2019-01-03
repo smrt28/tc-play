@@ -25,21 +25,18 @@ static void sigint_termios(int sa)
 static int read_passphrase(const char *prompt, char *pass, size_t bufsz)
 {
     struct termios termios_new;
-    ssize_t n;
-    int fd = STDIN_FILENO, r = 0;
+    ssize_t n = 0;
+    int fd = STDIN_FILENO;
     struct sigaction act, old_act;
     int is_tty = isatty(fd);
 
-    if (is_tty == 0)
-        errno = 0;
-
-    memset(pass, 0, bufsz);
+    if (!pass) return 0;
+    if (bufsz == 0) return 0;
+    if (is_tty == 0) errno = 0;
 
     fprintf(stderr, "%s", prompt);
     fflush(stdout);
 
-    /* If input is being provided by something which is not a terminal, don't
-     * change the settings. */
     if (is_tty) {
         tcgetattr(fd, &termios_old);
         memcpy(&termios_new, &termios_old, sizeof(termios_new));
@@ -51,48 +48,33 @@ static int read_passphrase(const char *prompt, char *pass, size_t bufsz)
 
         tty_fd = fd;
         sigaction(SIGINT, &act, &old_act);
-
         tcsetattr(fd, TCSAFLUSH, &termios_new);
     }
 
     n = read(fd, pass, bufsz);
     if (n > 0) {
-        pass[n-1] = '\0'; /* Strip trailing \n */
-    } else {
-        r = -1;
+        pass[n-1] = 0; 
+    } else if (n == 0) {
+        pass[0] = 0;
     }
 
     if (is_tty) {
         tcsetattr(fd, TCSAFLUSH, &termios_old);
         fputc('\n', stderr);
-
         sigaction(SIGINT, &old_act, NULL);
     }
 
-    return r;
+    return n - 1;
 }
 
-int tc_ykpiv_getpin(char *pin) {
-    char *pas = NULL;
-    pas = alloc_safe_mem(YKPIV_PIN_BUF_SIZE + 1);
-    if (!pas) {
-        pin[0] = 0;
-        return -1;
+int tc_ykpiv_getpin(char *pin, char *errmsg) {
+    int rv = 0;
+    int r = read_passphrase("Yubikey PIN:", pin, YKPIV_PIN_BUF_SIZE);
+
+    if (r < 6 || r > 8) {
+        CERROR(-1, "PIN must be 6-8 characters long.");
     }
 
-    memset(pas, 0, YKPIV_PIN_BUF_SIZE + 1);
-
-    // read +1 character above maximum to detect too long pin
-    read_passphrase("Yubikey PIN:", pas, YKPIV_PIN_BUF_SIZE + 1);
-
-    int len = strlen(pas);
-    if (len < YKPIV_PIN_MIN_SIZE || len > YKPIV_PIN_MAX_SIZE) {
-        pin[0] = 0;
-        free_safe_mem(pas);
-        return -1;
-    }
-
-    memcpy(pin, pas, len);
-    free_safe_mem(pas);
-    return 0;
+err:
+    return rv;
 }

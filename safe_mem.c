@@ -37,7 +37,7 @@
 
 #ifdef DEBUG
 
-#   define SAFE_MEM_REPORTING // TODO: make it configurable
+//#   define SAFE_MEM_REPORTING // TODO: make it configurable
 
 #endif
 

@@ -54,7 +54,7 @@
 #define FLAG_LONG_MOD_TO_FILE   0xff40
 #define FLAG_LONG_USE_HDR_FILE  0xfe01
 #define FLAG_LONG_USE_HHDR_FILE 0xfe02
-#define FLAG_LONG_NO_RETRIES    0xfabc
+#define FLAG_LONG_NO_PASSWORD    0xfabc
 
 
 static
@@ -236,7 +236,7 @@ static struct option longopts[] = {
     { "insecure-erase", no_argument,        NULL, 'z' },
     { "with-hdr-backup", no_argument,       NULL, 'B' },
     { "help",       no_argument,        NULL, 'h' },
-    { "no-retries",         no_argument,            NULL, FLAG_LONG_NO_RETRIES },
+    { "no-password", no_argument            NULL, FLAG_LONG_NO_PASSWORD },
     { NULL,         0,          NULL, 0   },
 };
 
@@ -424,8 +424,8 @@ main(int argc, char *argv[])
             opts->flags |= TC_FLAG_SAVE_TO_FILE;
             _set_str_opt(hdr_file_out);
             break;
-        case FLAG_LONG_NO_RETRIES:
-            opts->retries = 1;
+        case FLAG_LONG_NO_PASSWORD:
+            opts->flags |= TC_FLAG_NO_PASSWORD;
             break;
         case 'h':
         case '?':
