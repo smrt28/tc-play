@@ -74,13 +74,38 @@ printf(
 }
 
 
-static void self_test() {
+static int self_test() {
     char errmsg[ERR_MESSAGE_LEN];
     struct tc_yubico_key k;
 
     memset(&k, 0, sizeof(k));
     tc_parse_yubikey_path("//yubikey/piv/82/x", &k, errmsg);
-    if (k.secret_len != 1) { printf("err: %d\n", __LINE__); }
+    if (k.secret_len != 1) return __LINE__;
+
+    memset(&k, 0, sizeof(k));
+    tc_parse_yubikey_path("//yubikey/piv/82/xx", &k, errmsg);
+    if (k.secret_len != 2) return __LINE__;
+    if (k.type != 2) return __LINE__;
+
+    memset(&k, 0, sizeof(k));
+    tc_parse_yubikey_path("//yubikey/chl/1/xx", &k, errmsg);
+    if (k.secret_len != 2) return __LINE__;
+    if (k.type != 1) return __LINE__;
+
+    memset(&k, 0, sizeof(k));
+    tc_parse_yubikey_path("//yubikey/chl/3/xx", &k, errmsg);
+    if (k.type != -1) return __LINE__;
+
+    memset(&k, 0, sizeof(k));
+    tc_parse_yubikey_path("//yubikey/piv/82/", &k, errmsg);
+    if (k.secret_len != 0) return __LINE__;
+
+    memset(&k, 0, sizeof(k));
+    tc_parse_yubikey_path("//yubikey/pi/82/", &k, errmsg);
+    if (k.secret_len != 0) return __LINE__;
+    if (k.type != -1) return __LINE__;
+
+    return 0;
 }
 
 int main(int argc, char **argv) {
@@ -96,9 +121,6 @@ int main(int argc, char **argv) {
     char errmsg[ERR_MESSAGE_LEN];
     unsigned char *pass = NULL;
     struct tc_yubico_key key;
-
-
-    self_test();
 
     if (argc == 1) {
         usage();
@@ -117,7 +139,7 @@ int main(int argc, char **argv) {
             {0, 0, 0, 0}
         };
 
-        c = getopt_long(argc, argv, "hs:p:o:", long_options, &option_index);
+        c = getopt_long(argc, argv, "hs:p:o:t", long_options, &option_index);
         if (c == -1) break;
         switch (c) {
             case 's':
@@ -137,6 +159,9 @@ int main(int argc, char **argv) {
                 break;
             case 'h':
                 usage();
+                return 1;
+            case 't':
+                printf("%d\n", self_test());
                 return 1;
             default:
                 CERROR(ERR_YK_ARGS, "Unknown option\n");
