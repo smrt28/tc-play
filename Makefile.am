@@ -43,7 +43,7 @@ TCPLAY_EXTRACFLAGS+= @ARGON2_CFLAGS@
 ARGON2_SOURCE+= argon2.c
 endif
 
-yubico_keyfile_SOURCES = yubico/yubico-keyfile.c safe_mem.c $(YUBICO_PIV_COMMON)
+yubico_keyfile_SOURCES = yubico/yubico-keyfile.c safe_mem.c yubico/tc-common.c $(YUBICO_PIV_COMMON)
 yubico_keyfile_CFLAGS = @YKPIV_CFLAGS@ -Wall
 yubico_keyfile_LDADD = @YKPIV_LIBS@ -lgcrypt
 

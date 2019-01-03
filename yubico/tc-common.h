@@ -3,9 +3,13 @@
 
 #include "config.h"
 
+#define MAX_PASSSZ      64
+
 struct tc_yubico_key {
     int type;
     int slot;
+    int secret_len;
+    unsigned char secret[MAX_PASSSZ];
 };
 
 #define YUBIKEY_METHOD_INVALID 0

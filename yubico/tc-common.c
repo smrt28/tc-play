@@ -27,18 +27,21 @@ static int is_number(const char *s) {
  *
  * Example:
  *
- * //yubikey/piv/[piv-slot]
+ * //yubikey/piv/[piv-slot]/[secret]
  *
- * //yubikey/chl/[1-2]
+ * //yubikey/chl/[1-2]/[secret]
  *
  */
 
 int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
-        char *errmsg) 
+        char *errmsg)
 {
     const char *prefix = YUBIKEY_PATH_PREFIX;
+    size_t len;
     int type = 0;
     int slot = 0, rv = 0;
+
+    memset(yk, 0, sizeof(struct tc_yubico_key));
 
     while (*prefix) {
         if (*path != *prefix) return 0;
@@ -48,7 +51,6 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
     if (*path == 'c') { // chl
         prefix = "chl/";
         type = YUBIKEY_METHOD_CHL;
-
     } else if (*path == 'p') { // piv
         prefix = "piv/";
         type = YUBIKEY_METHOD_PIV;
@@ -66,6 +68,8 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
         ++path; ++prefix;
     }
 
+    if (*path == 0) CERROR(-1, "Slot number's missing in Yubikey path");
+
 
     switch(type) {
         case YUBIKEY_METHOD_CHL:
@@ -79,12 +83,24 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
             break;
     }
 
+    if (slot == 0) CERROR(-1, "Invalid slot");
 
     yk->type = type;
     yk->slot = slot;
 
+    while (*path != '/') {
+        ++path;
+        if (*path == 0) return type;
+    }
+    ++path;
+
+    len = strlen(path);
+    if (len > sizeof(yk->secret)) CERROR(-1, "Yubikey path is too long");
+    memcpy(yk->secret, path, len);
+    yk->secret_len = len;
     return type;
 
 err:
+    yk->type = -1;
     return rv;
 }

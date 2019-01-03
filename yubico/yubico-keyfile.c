@@ -11,16 +11,12 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "yubico/tc-common.h"
 #include "yubico/piv.h"
 #include "yubico/error.h"
 #include "safe_mem.h"
 
-#define MAX_PASSSZ      64
 
-struct _ykey_options {
-    int slot;
-    const char *pin;
-};
 
 static void print_hex(unsigned char *buf, size_t len) {
     size_t i;
@@ -32,7 +28,7 @@ static void print_hex(unsigned char *buf, size_t len) {
 
 static void usage() {
     printf("usage: yubico-keyfile -s slot [-p pin] [-o keyfile]\n\n"
-            "-s, --slot=<slot>\n"
+            "-s, --yubikey-path=<yubikey path>\n"
                 "\t If slot=list lists available slots\n"
             "-p, --pin=<pin>"
                 "\t PIV pin\n"
@@ -43,34 +39,48 @@ static void usage() {
 
 static void print_slots() {
 printf(
-"Slots available:\n"
-"   AUTHENTICATION 0x9a\n"
-"   SIGNATURE      0x9c\n"
-"   KEYMGM         0x9d\n"
-"   CARDAUTH       0x9e\n"
+"CHL slots\n"
+"   //yubikey/chl/1\n"
+"   //yubikey/chl/2\n"
 "\n"
-"Slots only available on the YubiKey 4 and 5:\n"
-"   RETIRED-01 0x82\n"
-"   RETIRED-02 0x83\n"
-"   RETIRED-03 0x84\n"
-"   RETIRED-04 0x85\n"
-"   RETIRED-05 0x86\n"
-"   RETIRED-06 0x87\n"
-"   RETIRED-07 0x88\n"
-"   RETIRED-08 0x89\n"
-"   RETIRED-09 0x8a\n"
-"   RETIRED-10 0x8b\n"
-"   RETIRED-11 0x8c\n"
-"   RETIRED-12 0x8d\n"
-"   RETIRED-13 0x8e\n"
-"   RETIRED-14 0x8f\n"
-"   RETIRED-15 0x90\n"
-"   RETIRED-16 0x91\n"
-"   RETIRED-17 0x92\n"
-"   RETIRED-18 0x93\n"
-"   RETIRED-19 0x94\n"
-"   RETIRED-20 0x95\n"
+"PIV slots available:\n"
+"   AUTHENTICATION //yubikey/piv/9a\n"
+"   SIGNATURE      //yubikey/piv/9c\n"
+"   KEYMGM         //yubikey/piv/9d\n"
+"   CARDAUTH       //yubikey/piv/9e\n"
+"\n"
+"PIV slots only available on the YubiKey 4 and 5:\n"
+"   RETIRED-01 //yubikey/piv/82\n"
+"   RETIRED-02 //yubikey/piv/83\n"
+"   RETIRED-03 //yubikey/piv/84\n"
+"   RETIRED-04 //yubikey/piv/85\n"
+"   RETIRED-05 //yubikey/piv/86\n"
+"   RETIRED-06 //yubikey/piv/87\n"
+"   RETIRED-07 //yubikey/piv/88\n"
+"   RETIRED-08 //yubikey/piv/89\n"
+"   RETIRED-09 //yubikey/piv/8a\n"
+"   RETIRED-10 //yubikey/piv/8b\n"
+"   RETIRED-11 //yubikey/piv/8c\n"
+"   RETIRED-12 //yubikey/piv/8d\n"
+"   RETIRED-13 //yubikey/piv/8e\n"
+"   RETIRED-14 //yubikey/piv/8f\n"
+"   RETIRED-15 //yubikey/piv/90\n"
+"   RETIRED-16 //yubikey/piv/91\n"
+"   RETIRED-17 //yubikey/piv/92\n"
+"   RETIRED-18 //yubikey/piv/93\n"
+"   RETIRED-19 //yubikey/piv/94\n"
+"   RETIRED-20 //yubikey/piv/95\n"
 );
+}
+
+
+static void self_test() {
+    char errmsg[ERR_MESSAGE_LEN];
+    struct tc_yubico_key k;
+
+    memset(&k, 0, sizeof(k));
+    tc_parse_yubikey_path("//yubikey/piv/82/x", &k, errmsg);
+    if (k.secret_len != 1) { printf("err: %d\n", __LINE__); }
 }
 
 int main(int argc, char **argv) {
@@ -81,22 +91,27 @@ int main(int argc, char **argv) {
     const char *keyfile = NULL;
     unsigned char *secret = NULL;
     int fd = -1;
+    const char *pin = NULL;
     char *pinbuf = NULL;
     char errmsg[ERR_MESSAGE_LEN];
-    struct _ykey_options o;
     unsigned char *pass = NULL;
+    struct tc_yubico_key key;
+
+
+    self_test();
 
     if (argc == 1) {
         usage();
         return 1;
     }
 
-    memset(&o, 0, sizeof(o));
     atexit(check_and_purge_safe_mem);
+
+    memset(&key, 0, sizeof(key));
 
     for (;;) {
         static struct option long_options[] = {
-            { "slot", required_argument, 0, 's' },
+            { "yubikey-path", required_argument, 0, 's' },
             { "pin", optional_argument, 0, 'p' },
             { "out", optional_argument, 0, 'o' },
             {0, 0, 0, 0}
@@ -110,14 +125,12 @@ int main(int argc, char **argv) {
                     print_slots();
                     return 1;
                 }
-                if (strlen(optarg) > 2 && optarg[0] == '0' && optarg[0] == 'x') {
-                    o.slot = strtol(optarg + 2, NULL, 16);
-                } else {
-                    o.slot = strtol(optarg, NULL, 16);
+                if (tc_parse_yubikey_path(optarg, &key, errmsg) <= 0) {
+                    CERROR(ERR_YK_ARGS, "Invalid yubikey path");
                 }
                 break;
             case 'p':
-                o.pin = optarg;
+                pin = optarg;
                 break;
             case 'o':
                 keyfile = optarg;
@@ -145,37 +158,41 @@ int main(int argc, char **argv) {
     memset(secret, 0, YKPIV_SECRET_LEN);
 
     len = 0;
-    if (!o.pin) {
+    if (!pin) {
         if (tc_ykpiv_getpin(pinbuf) != 0) {
             CERROR(ERR_YK_ARGS, "PIN must be 6-8 characters long!");
         }
-        o.pin = pinbuf;
+        pin = pinbuf;
     } else {
-        len = strlen(o.pin);
+        len = strlen(pin);
         if (len < YKPIV_PIN_MIN_SIZE || len > YKPIV_PIN_MAX_SIZE) {
             CERROR(ERR_YK_ARGS, "PIN must be 6-8 characters long!");
         }
     }
 
-    struct tc_ykpiv_args args;
-    memset(&args, 0, sizeof(args));
-
     pass = alloc_safe_mem(MAX_PASSSZ);
-    if (!pass) {
-        CERROR(ERR_YK_GENERAL, "can't allocate memory");
-    }
+    if (!pass) CERROR(ERR_YK_GENERAL, "can't allocate memory");
     memset(pass, 0, MAX_PASSSZ);
 
-    char *pw = getpass("Password:");
-    len = strlen(pw);
-    if (len > 64) len = 64;
-    memcpy(pass, pw, len);
+    if (key.secret_len > 0) {
+        memcpy(pass, key.secret, key.secret_len);
+    } else {
+        char *pw = getpass("Password:");
+        len = strlen(pw);
+        if (len > 64) len = 64;
+        memcpy(pass, pw, len);
+    }
 
-    args.pass = pass;
-    args.pass_len = MAX_PASSSZ;
-
-    rv = tc_ykpiv_fetch_secret(o.slot, o.pin, secret, YKPIV_SECRET_LEN, errmsg, &args);
-    if (rv != 0) goto err;
+    switch(key.type) {
+        case YUBIKEY_METHOD_PIV:
+            rv = tc_ykpiv_fetch_secret(key.slot, pin, secret,
+                    YKPIV_SECRET_LEN, pass, MAX_PASSSZ, errmsg);
+            if (rv != 0) goto err;
+            break;
+        default:
+            CERROR(ERR_YK_ARGS, "not implemented for the yubikey path");
+            break;
+    }
 
     print_hex(secret, YKPIV_SECRET_LEN);
     if (keyfile) {
