@@ -72,15 +72,19 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
 
 
     switch(type) {
+#ifdef HAVE_YK_CHL
         case YUBIKEY_METHOD_CHL:
             slot = atoi(path);
             if (slot < 1 || slot > 2)
                 CERROR(-1, "Invalid slot number. "
                         "Should be: //yubikey/chl/[1,2]");
             break;
+#endif
+#ifdef HAVE_YK_PIV
         case YUBIKEY_METHOD_PIV:
             slot = strtol(path, NULL, 16);
             break;
+#endif
     }
 
     if (slot == 0) CERROR(-1, "Invalid slot");

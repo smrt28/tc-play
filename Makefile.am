@@ -15,6 +15,9 @@ endif
 
 TCPLAY_LIBS= @TCPLAY_DEPS_LIBS@
 TCPLAY_EXTRACFLAGS= @TCPLAY_DEPS_CFLAGS@
+KEYTOOL_FLAGS=
+KEYTOOL_LIBS=
+
 YUBICO_SOURCE=
 ARGON2_SOURCE=
 
@@ -25,12 +28,23 @@ if WITH_YUBICO_PIV
 bin_PROGRAMS+= yubico-keyfile
 TCPLAY_LIBS+= @YKPIV_LIBS@
 TCPLAY_EXTRACFLAGS+= @YKPIV_CFLAGS@
+
+KEYTOOL_LIBS+=  @YKPIV_LIBS@
+KEYTOOL_FLAGS+= @YKPIV_CFLAGS@
+
 YUBICO_SOURCE+= $(YUBICO_PIV_COMMON) yubico/tc-common.c
 endif
 
+
+
 if WITH_YUBICO_CHL
-TCPLAY_EXTRACFLAGS+= @YKCHL_CFLAGS@
 TCPLAY_LIBS+= @YKCHL_LIBS@
+TCPLAY_EXTRACFLAGS+= @YKCHL_CFLAGS@
+
+
+KEYTOOL_LIBS+= @YKCHL_LIBS@
+KEYTOOL_FLAGS+= @YKCHL_CFLAGS@
+
 YUBICO_SOURCE+= yubico/chalresp.c
 endif
 
@@ -40,9 +54,9 @@ TCPLAY_EXTRACFLAGS+= @ARGON2_CFLAGS@
 ARGON2_SOURCE+= argon2.c
 endif
 
-yubico_keyfile_SOURCES = yubico/yubico-keyfile.c safe_mem.c yubico/tc-common.c $(YUBICO_PIV_COMMON)
-yubico_keyfile_CFLAGS = @YKPIV_CFLAGS@ -Wall
-yubico_keyfile_LDADD = @YKPIV_LIBS@ -lgcrypt
+yubico_keyfile_SOURCES = yubico/yubico-keyfile.c safe_mem.c $(YUBICO_SOURCE) 
+yubico_keyfile_CFLAGS = $(KEYTOOL_FLAGS) -Wall
+yubico_keyfile_LDADD = $(KEYTOOL_LIBS) -lgcrypt
 
 
 tcplay_CFLAGS = -DMAJ_VER=2 -DMIN_VER=0 -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
@@ -53,3 +67,6 @@ tcplay_SOURCES = \
 	crypto.c crypto-gcrypt.c main.c generic_xts.c pbkdf2-gcrypt.c $(YUBICO_SOURCE) $(ARGON2_SOURCE)
 
 tcplay_LDADD = $(TCPLAY_LIBS)
+
+
+

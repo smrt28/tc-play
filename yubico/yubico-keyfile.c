@@ -16,7 +16,7 @@
 #include "yubico/error.h"
 #include "safe_mem.h"
 
-
+#include "config.h"
 
 static void print_hex(unsigned char *buf, size_t len) {
     size_t i;
@@ -39,10 +39,13 @@ static void usage() {
 
 static void print_slots() {
 printf(
+#ifdef HAVE_YK_CHL
 "CHL slots\n"
 "   //yubikey/chl/1\n"
 "   //yubikey/chl/2\n"
 "\n"
+#endif
+#ifdef HAVE_YK_PIV
 "PIV slots available:\n"
 "   AUTHENTICATION //yubikey/piv/9a\n"
 "   SIGNATURE      //yubikey/piv/9c\n"
@@ -70,6 +73,7 @@ printf(
 "   RETIRED-18 //yubikey/piv/93\n"
 "   RETIRED-19 //yubikey/piv/94\n"
 "   RETIRED-20 //yubikey/piv/95\n"
+#endif
 );
 }
 
