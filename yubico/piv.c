@@ -52,8 +52,7 @@ err:
     return rv;
 }
 
-static int expand_secret(const unsigned char *secret, int secret_len, unsigned char *out, int out_len) {
-    const int iter = 3;
+static int expand_secret(int iter, const unsigned char *secret, int secret_len, unsigned char *out, int out_len) {
     if (gcry_kdf_derive((const char *)secret, secret_len, GCRY_KDF_PBKDF2, GCRY_MD_BLAKE2B_512, "\0", 1, iter,
             out_len, (char *)out) != 0) return -1;
     return 0;
@@ -79,7 +78,7 @@ int  tc_ykpiv_fetch_secret(int slot, const char * pin,
     ciphertext = alloc_safe_mem(YKPIV_ENCRYPTED_SECRET_LEN);
     if (!ciphertext) CERROR(ERR_YK_ALLOC, "Error allocating memory for ciphertext");
 
-    if (expand_secret(pass, pass_len, ciphertext, YKPIV_ENCRYPTED_SECRET_LEN) != 0)
+    if (expand_secret(1000, pass, pass_len, ciphertext, YKPIV_ENCRYPTED_SECRET_LEN) != 0)
         CERROR(ERR_YK_CRYPTO, "expand secret failed");
 
     ciphertext[0] &= 0x7f;
@@ -91,7 +90,7 @@ int  tc_ykpiv_fetch_secret(int slot, const char * pin,
     if (len != YKPIV_ENCRYPTED_SECRET_LEN) CERROR(ERR_YK_CRYPTO,
             "Wrong expected Yubikey object length");
 
-    if (expand_secret(plaintext, len, secret_out, secret_out_len) != 0) {
+    if (expand_secret(3, plaintext, len, secret_out, secret_out_len) != 0) {
         CERROR(ERR_YK_CRYPTO, "Can't expand secret");
     }
 

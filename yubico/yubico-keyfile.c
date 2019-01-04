@@ -221,7 +221,8 @@ int main(int argc, char **argv) {
                 printf("%d\n", self_test());
                 return 1;
             default:
-                CERROR(ERR_YK_ARGS, "Unknown option\n");
+                CERROR(ERR_YK_ARGS, "Unknown option");
+                break;
         }
     }
 
