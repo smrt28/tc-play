@@ -40,6 +40,9 @@ AC_ARG_ENABLE([tc-yubico-debug],
 
 if [ test "x$with_yubico_piv" = xyes -o "x$with_yubico_chl" = xyes ]; then
     AC_DEFINE([HAVE_YUBIKEY], [1], [You have Yubikey])
+    AM_CONDITIONAL([WITH_YUBICO], [ true ])
+else
+    AM_CONDITIONAL([WITH_YUBICO], [ false ])
 fi
 
 
@@ -50,7 +53,7 @@ AM_CONDITIONAL([WITH_YUBICO_CHL], [test "x$with_yubico_chl" = xyes])
 AM_CONDITIONAL([WITH_ARGON2], [test "x$with_argon2" = xyes])
 
 AC_CHECK_LIB(gcrypt, gcry_free, [
-	TCPLAY_DEPS_LIBS+=' -lgcrypt'
+    TCPLAY_DEPS_LIBS+=' -lgcrypt'
 ], [AC_MSG_ERROR([library 'grypt' is required])])
 
 AC_CONFIG_HEADER(config.h)

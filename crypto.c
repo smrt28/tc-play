@@ -229,13 +229,14 @@ apply_keyfiles(unsigned char *pass, size_t pass_memsz, const char *keyfiles[],
     uint32_t crc;
 
 #ifdef HAVE_YUBIKEY
+    int yktype;
+    struct tc_yubico_key yk;
+
     char errmsg[ERR_MESSAGE_LEN];
 #endif
 
 #ifdef HAVE_YK_PIV
     char *ykpin = NULL;
-    int yktype;
-    struct tc_yubico_key yk;
 #endif
 
     if (pass_memsz < MAX_PASSSZ) {

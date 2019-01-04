@@ -1,7 +1,6 @@
 
 #include <unistd.h>
 #include <getopt.h>
-#include <ykpiv.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,9 +10,18 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "yubico/tc-common.h"
-#include "yubico/piv.h"
 #include "yubico/error.h"
+#include "yubico/tc-common.h"
+
+#ifdef HAVE_YK_PIV
+#include <ykpiv.h>
+#include "yubico/piv.h"
+#endif
+
+#ifdef HAVE_YK_CHL
+#include "yubico/chalresp.h"
+#endif
+
 #include "safe_mem.h"
 
 #include "config.h"
@@ -112,6 +120,63 @@ static int self_test() {
     return 0;
 }
 
+int write_keyfile(const char *keyfile, unsigned char *secret, int len, char *errmsg) {
+    int rv = 0;
+
+    if (!keyfile) return 0;
+
+    int fd = open(keyfile, O_CREAT | O_WRONLY, 0644);
+
+    if (fd < 0) CERROR(ERR_YK_ARGS, "Can't open keyfile!");
+    if (write(fd, secret, len) != len) {
+        CERROR(ERR_YK_ARGS, "Can't write keyfile!");
+    }
+err:
+    if (fd >= 0) close(fd);
+    return rv;
+}
+
+
+#ifdef HAVE_YK_CHL
+int handle_chl(struct tc_yubico_key *key, const char *keyfile, char *errmsg) {
+    int fd = -1;
+    int rv = 0;
+    int len;
+    unsigned char *pass = NULL;
+    unsigned char *secret = NULL;
+
+
+    pass = alloc_safe_mem(MAX_PASSSZ);
+    if (!pass) CERROR(ERR_YK_GENERAL, "can't allocate memory");
+    memset(pass, 0, MAX_PASSSZ);
+
+    secret = alloc_safe_mem(YKCHL_RESPONSE_LENGTH);
+    if (!secret) CERROR(ERR_YK_GENERAL, "Can't allocate memory for secret!");
+    memset(secret, 0, YKCHL_RESPONSE_LENGTH);
+
+
+    if (key->secret_len > 0) {
+        memcpy(pass, key->secret, key->secret_len);
+    } else {
+        char *pw = getpass("Password:");
+        len = strlen(pw);
+        if (len > 64) len = 64;
+        memcpy(pass, pw, len);
+    }
+
+    if ((rv = tc_ykchl_hmac(key->slot, pass, MAX_PASSSZ, secret, errmsg)) != 0) goto err;
+
+    print_hex(secret, YKCHL_RESPONSE_LENGTH);
+    if ((rv = write_keyfile(keyfile, secret, YKCHL_RESPONSE_LENGTH, errmsg)) != 0) goto err;
+err:
+    free_safe_mem(secret);
+    free_safe_mem(pass);
+    if (fd >= 0) close(fd);
+    return rv;
+}
+#endif
+
+#ifdef HAVE_YK_PIV
 int handle_piv(const char *pin, struct tc_yubico_key *key, const char *keyfile, char *errmsg) {
     int rv = 0;
     unsigned char *secret = NULL;
@@ -130,7 +195,7 @@ int handle_piv(const char *pin, struct tc_yubico_key *key, const char *keyfile, 
         if (!pinbuf) CERROR(ERR_YK_GENERAL, "Can't allocate memory for bin buffer!");
         memset(pinbuf, 0, YKPIV_PIN_BUF_SIZE);
 
-        if ((rv = tc_ykpiv_getpin(pinbuf, errmsg)) != 0) goto err; 
+        if ((rv = tc_ykpiv_getpin(pinbuf, errmsg)) != 0) goto err;
         pin = pinbuf;
     }
 
@@ -149,18 +214,11 @@ int handle_piv(const char *pin, struct tc_yubico_key *key, const char *keyfile, 
 
     rv = tc_ykpiv_fetch_secret(key->slot, pin, secret,
             YKPIV_SECRET_LEN, pass, MAX_PASSSZ, errmsg);
+
     if (rv != 0) goto err;
 
     print_hex(secret, YKPIV_SECRET_LEN);
-    if (keyfile) {
-        fd = open(keyfile, O_CREAT | O_WRONLY, 0644);
-        if (fd < 0) {
-            CERROR(ERR_YK_ARGS, "Can't open keyfile!");
-        }
-        if (write(fd, secret, YKPIV_SECRET_LEN) != YKPIV_SECRET_LEN) {
-            CERROR(ERR_YK_ARGS, "Can't write keyfile!");
-        }
-    }
+    if ((rv = write_keyfile(keyfile, secret, YKPIV_SECRET_LEN, errmsg)) != 0) goto err;
 
 err:
     free_safe_mem(secret);
@@ -170,12 +228,15 @@ err:
 
     return rv;
 }
+#endif
 
 int main(int argc, char **argv) {
     int option_index = 0;
     int c, rv = 0;
     const char *keyfile = NULL;
+#ifdef HAVE_YK_PIV
     const char *pin = NULL;
+#endif
     char errmsg[ERR_MESSAGE_LEN];
     struct tc_yubico_key key;
 
@@ -208,9 +269,11 @@ int main(int argc, char **argv) {
                     CERROR(ERR_YK_ARGS, "Invalid yubikey path");
                 }
                 break;
+#ifdef HAVE_YK_PIV
             case 'p':
                 pin = optarg;
                 break;
+#endif
             case 'o':
                 keyfile = optarg;
                 break;
@@ -231,9 +294,16 @@ int main(int argc, char **argv) {
     }
 
     switch(key.type) {
+#ifdef HAVE_YK_PIV
         case YUBIKEY_METHOD_PIV:
             rv = handle_piv(pin, &key, keyfile, errmsg);
             break;
+#endif
+#ifdef HAVE_YK_CHL
+        case YUBIKEY_METHOD_CHL:
+            rv = handle_chl(&key, keyfile, errmsg);
+            break;
+#endif
         default:
             CERROR(ERR_YK_ARGS, "not implemented for the yubikey path");
             break;
