@@ -52,11 +52,6 @@ static int read_passphrase(const char *prompt, char *pass, size_t bufsz)
     }
 
     n = read(fd, pass, bufsz);
-    if (n > 0) {
-        pass[n-1] = 0; 
-    } else if (n == 0) {
-        pass[0] = 0;
-    }
 
     if (is_tty) {
         tcsetattr(fd, TCSAFLUSH, &termios_old);
@@ -64,12 +59,20 @@ static int read_passphrase(const char *prompt, char *pass, size_t bufsz)
         sigaction(SIGINT, &old_act, NULL);
     }
 
-    return n - 1;
+    if (n < 0) return -1;
+    if (n > 0) n--; // handle '\n'
+    pass[n] = 0;
+
+    return n;
 }
 
 int tc_ykpiv_getpin(char *pin, char *errmsg) {
     int rv = 0;
     int r = read_passphrase("Yubikey PIN:", pin, YKPIV_PIN_BUF_SIZE);
+
+    if (r < 0) {
+        CERROR(-1, "Can't read from tty.");
+    }
 
     if (r < 6 || r > 8) {
         CERROR(-1, "PIN must be 6-8 characters long.");
