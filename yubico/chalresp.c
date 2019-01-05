@@ -26,8 +26,6 @@ int tc_ykchl_hmac(int slot, unsigned char *pass, int passlen,
     if (!response) CERROR(-1, "Error allocating memory for "
             "Yubikey response");
 
-    memset(response, 0, SHA1_MAX_BLOCK_SIZE);
-
     int yk_cmd;
 
     if (slot == 1)  {

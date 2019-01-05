@@ -79,7 +79,7 @@ int  tc_ykpiv_fetch_secret(int slot, const char * pin,
     if (!ciphertext) CERROR(ERR_YK_ALLOC, "Error allocating memory for ciphertext");
 
     if (expand_secret(1000, pass, pass_len, ciphertext, YKPIV_ENCRYPTED_SECRET_LEN) != 0)
-        CERROR(ERR_YK_CRYPTO, "expand secret failed");
+        CERROR(ERR_YK_CRYPTO, "Expand secret failed");
 
     ciphertext[0] &= 0x7f;
 
@@ -90,8 +90,8 @@ int  tc_ykpiv_fetch_secret(int slot, const char * pin,
     if (len != YKPIV_ENCRYPTED_SECRET_LEN) CERROR(ERR_YK_CRYPTO,
             "Wrong expected Yubikey object length");
 
-    if (expand_secret(3, plaintext, len, secret_out, secret_out_len) != 0) {
-        CERROR(ERR_YK_CRYPTO, "Can't expand secret");
+    if (expand_secret(10, plaintext, len, secret_out, secret_out_len) != 0) {
+        CERROR(ERR_YK_CRYPTO, "Expand secret failed");
     }
 
 err:

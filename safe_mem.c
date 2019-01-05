@@ -67,8 +67,7 @@ int enable_safe_mem_global_lock(void) {
     return -1;
 }
 
-void *
-_alloc_safe_mem(size_t req_sz, const char *file, int line)
+void * _alloc_safe_mem(size_t req_sz, const char *file, int line)
 {
     struct safe_mem_hdr *hdr, *hdrp;
     struct safe_mem_tail *tail;
@@ -112,6 +111,15 @@ _alloc_safe_mem(size_t req_sz, const char *file, int line)
 
     return user_mem;
 }
+
+
+void * _calloc_safe_mem(size_t req_sz, const char *file, int line) {
+    void * rv = _alloc_safe_mem(req_sz, file, line);
+    if (!rv) return NULL;
+    memset(rv, 0, req_sz);
+    return rv;
+}
+
 
 void
 _free_safe_mem(void *mem_ptr, const char *file, int line)

@@ -89,7 +89,7 @@ printf(
 static int self_test() {
     char errmsg[ERR_MESSAGE_LEN];
     struct tc_yubico_key k;
-
+#ifdef HAVE_YK_PIV
     memset(&k, 0, sizeof(k));
     tc_parse_yubikey_path("//yubikey/piv/82/x", &k, errmsg);
     if (k.secret_len != 1) return __LINE__;
@@ -99,14 +99,6 @@ static int self_test() {
     if (k.secret_len != 2) return __LINE__;
     if (k.type != 2) return __LINE__;
 
-    memset(&k, 0, sizeof(k));
-    tc_parse_yubikey_path("//yubikey/chl/1/xx", &k, errmsg);
-    if (k.secret_len != 2) return __LINE__;
-    if (k.type != 1) return __LINE__;
-
-    memset(&k, 0, sizeof(k));
-    tc_parse_yubikey_path("//yubikey/chl/3/xx", &k, errmsg);
-    if (k.type != -1) return __LINE__;
 
     memset(&k, 0, sizeof(k));
     tc_parse_yubikey_path("//yubikey/piv/82/", &k, errmsg);
@@ -116,7 +108,17 @@ static int self_test() {
     tc_parse_yubikey_path("//yubikey/pi/82/", &k, errmsg);
     if (k.secret_len != 0) return __LINE__;
     if (k.type != -1) return __LINE__;
+#endif
+#ifdef HAVE_YK_CHL
+    memset(&k, 0, sizeof(k));
+    tc_parse_yubikey_path("//yubikey/chl/1/xx", &k, errmsg);
+    if (k.secret_len != 2) return __LINE__;
+    if (k.type != 1) return __LINE__;
 
+    memset(&k, 0, sizeof(k));
+    tc_parse_yubikey_path("//yubikey/chl/3/xx", &k, errmsg);
+    if (k.type != -1) return __LINE__;
+#endif
     return 0;
 }
 
@@ -145,15 +147,12 @@ int handle_chl(struct tc_yubico_key *key, const char *keyfile, char *errmsg) {
     unsigned char *pass = NULL;
     unsigned char *secret = NULL;
 
-
     pass = alloc_safe_mem(MAX_PASSSZ);
     if (!pass) CERROR(ERR_YK_GENERAL, "can't allocate memory");
     memset(pass, 0, MAX_PASSSZ);
 
     secret = alloc_safe_mem(YKCHL_RESPONSE_LENGTH);
     if (!secret) CERROR(ERR_YK_GENERAL, "Can't allocate memory for secret!");
-    memset(secret, 0, YKCHL_RESPONSE_LENGTH);
-
 
     if (key->secret_len > 0) {
         memcpy(pass, key->secret, key->secret_len);
@@ -193,15 +192,13 @@ int handle_piv(const char *pin, struct tc_yubico_key *key, const char *keyfile, 
     if (!pin) {
         pinbuf = alloc_safe_mem(YKPIV_PIN_BUF_SIZE);
         if (!pinbuf) CERROR(ERR_YK_GENERAL, "Can't allocate memory for bin buffer!");
-        memset(pinbuf, 0, YKPIV_PIN_BUF_SIZE);
 
         if ((rv = tc_ykpiv_getpin(pinbuf, errmsg)) != 0) goto err;
         pin = pinbuf;
     }
 
-    pass = alloc_safe_mem(MAX_PASSSZ);
+    pass = calloc_safe_mem(MAX_PASSSZ);
     if (!pass) CERROR(ERR_YK_GENERAL, "can't allocate memory");
-    memset(pass, 0, MAX_PASSSZ);
 
     if (key->secret_len > 0) {
         memcpy(pass, key->secret, key->secret_len);
@@ -305,7 +302,7 @@ int main(int argc, char **argv) {
             break;
 #endif
         default:
-            CERROR(ERR_YK_ARGS, "not implemented for the yubikey path");
+            CERROR(ERR_YK_ARGS, "not a yubikey path");
             break;
     }
 

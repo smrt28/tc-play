@@ -247,13 +247,10 @@ apply_keyfiles(unsigned char *pass, size_t pass_memsz, const char *keyfiles[],
     pl = strlen((char *)pass);
     memset(pass+pl, 0, MAX_PASSSZ-pl);
 
-    if ((kpool = alloc_safe_mem(KPOOL_SZ)) == NULL) {
+    if ((kpool = calloc_safe_mem(KPOOL_SZ)) == NULL) {
         tc_log(1, "Error allocating memory for keyfile pool\n");
         rv = ENOMEM; goto err;
     }
-
-    memset(kpool, 0, KPOOL_SZ);
-
 
     for (k = 0; k < nkeyfiles; k++) {
 #ifdef DEBUG
@@ -303,8 +300,6 @@ apply_keyfiles(unsigned char *pass, size_t pass_memsz, const char *keyfiles[],
                     tc_log(1, "error: %s", errmsg);
                     rv = EIO; goto err;
                 }
-
-                memset(kdata, 0, YKPIV_SECRET_LEN);
 
                 if (yk.secret_len == 0) {
                     if (tc_ykpiv_fetch_secret(yk.slot, ykpin, kdata, YKPIV_SECRET_LEN,
