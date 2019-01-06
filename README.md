@@ -23,61 +23,96 @@ the trial and error approach.
 Yubikey
 ==========
 The goal is to use Yubico stick as a PIN-protected secret provider and use the
-secret as a part of the TrueCrypt encryption key.
+secret to derive the TrueCrypt header-key.
 
-It seems there is no way to store arbitrary PIN protected secret on the Yubikey
-by a proper way. Yubikey has just five data slots which are supposed to be
-holding PIN protected data. Any of those slots are not supposed to carry this
-type of data. This tc-play version is a workaround implementation.
+It seems there is no proper way to store an arbitrary PIN protected secret on
+the Yubikey. Yubikey has just five data slots which are supposed to be holding
+PIN protected data. According to PIV spec. any of those slots is not supposed
+to carry this type of data. This code is a workaround implementation.
 
 Yubico PIV allows storing RSA2048 keys in several slots. An exact number of the
 slots varies on the Yubikey version. There should be about 24 slots available
 for this purpose on Yubikey 4 and Yubikey 5. It seems there are just four slots
 available on Yubikey NEO. The slots are write-only, the RSA key imported into
 the slot can't be read back. The key in Yubikey PIV can be used for decrypting
-and signing only, and all those operations are PIN protected which I use.
+and signing only, and all those operations are PIN protected.
 
 Sign operation can't be used since it adds random padding to the resulting
 signature and we need the secret obtained from the Yubikey to be deterministic.
-So the solution is based on decipher operation.
+So the solution is based on the decipher operation.
+
+Before using the Yubikey you have to set up a PIV slot with an RSA2048 key
+which Yubikey will use for derive the secret. For instance, you can let
+youbikey to generate it for you by itself:
+
+    yubico-piv-tool -a generate -s 82
+
+TcPlay handles Yubikey as a device with a key file on it. Surprisingly you can
+pass the key file to TcPlay by the obvious -k argument. To use the PIV secret
+derivation approach, the key file name should be in the following format:
+
+//yubikey/piv/[slot]/[nonce]
+
+You can also use HMAC challenge-response approach by passing:
+
+//yubikey/chl/[slot]/[nonce]
+
+Note, HMAC challenge-response doesn't require the PIN.
+
+For instance, to mount the device using Yubikey PIV slot 90 you would use this
+command:
+
+tcplay -d /dev/loop10 -m xxx -k //yubikey/piv/90/a
 
 
 The secret derivation
 ---------------------
 
-Before using the Yubikey you have to set up a PIV slot with an RSA2048 key
-which Yubikey will use for generating the secret. For instance:
+TcPlay uses Yubikey to derive the secret from the nonce within the key file
+path. If you enter the yubikey file name without the nonce part like
+//yubikey/piv/90, the disk encryption password would be used instead.
 
-    yubico-piv-tool -a generate -s 82
+PBKF2 with Blake2 hash algorithm and 1000 iterations derives a chunk of 256
+bytes (2048 bits) from the nonce.
 
-First, PBKF2 derives a chunk of 256 bytes (2048 bits) from the password. PBKF2
-is not used for security purpose there; its role is a hash function of
-arbitrary output size only. It uses just a single iteration. The very first
-chunk bit is set to 0 explicitly to ensure that the represented number, is
-lower then RSA2048 modulus.
+The very first bit of the chunk is masked out to ensure that the number it
+represents, is lower then RSA2048 modulus.
 
 The chunk is passed to the given Yubico slot decipher function which returns
-the result of RSA formula c^d mod m where d is private. PBKF2 derives the
-result secret.
-
-This approach ensures the secret would be calculated from the RSA private key
-which is hidden within the Yubikey PIV slot by deciphering operation which is
-PIN protected. The any size secret is obtained from the RSA 256bit result by
-PBKF2 hashing.
-
+the result of the RSA formula c^d mod m where d is private hidden on Yubikey.
+PBKF2 with 10 iterations derives the final secret. The final 512bit secret will
+be used as the key file content.
 
 yubico-keyfile
 --------------
 
-The tc-play uses Yubikey secret to derive header-key in the same way as
-TrueCrypt/tc-play derives header-key from keyfiles. The "yubico-keyfile"
+TcPlay uses Yubikey secret to derive header-key in the same way as
+TrueCrypt/tc-play derives header-key from keyi files. The "yubico-keyfile"
 utility can obtain the secret from the Yubikey for you and store it in the
-file. You can use this file as a backup. It would work as a keyfile as well as
-your Yubikey.
+file. You can backup the file. It would work as a keyfile as well as your
+Yubikey.
+
+yubico-keyfile -s //yubikey/piv/90/a -o ./keyfile
+
+Then those commands would do the same:
+
+
+# derives secret from the yubikey device
+tcplay -d /dev/loop10 -m xxx -k //yubikey/piv/90/a
+
+# reads the same device from the key file
+tcplay -d /dev/loop10 -m xxx -k ./keyfile
+
+
+New algorithm
+=============
+
+crypto: CAMELLIA
+hashing: Argon2 - needs 1GB memory
 
 
 Implementation notes
-==========
+====================
 DragonFly BSD uses the hybrid OpenSSL + cryptodev(9) approach that can be
 found in crypto-dev.c. OpenSSL is only used for the hash/pbkdf2. The
 encryption/decryption is performed via cryptodev(9) with enabled cryptosoft.
@@ -110,39 +145,10 @@ On Ubuntu, the following dev packages are needed to build tcplay:
     apt-get install build-essential libdevmapper-dev libgcrypt11-dev uuid-dev
 
 
-cmake
-----------
-New in version 1.0 is a cmake build system. tcplay can now be built using:
+Following packages are needed to enable Yubico and Argon2 support: 
 
-    mkdir objdir
-    cd objdir
-    cmake ..
-    make
-
-NOTE: building inside the source directory is discouraged, so please do
-build inside an "objdir" directory. If you happen to do it anyway, you can
-clean up behind cmake using:
-
-    make -f Makefile.classic clean_cmake_mess
-
-Before running `cmake`, make sure you have `pkg-config` installed; e.g. on a
-Debian or Ubuntu system you can install it using:
-
-    apt-get install pkg-config
-
-This process will check for dependencies and automatically select whether to
-use OpenSSL or gcrypt as PBKDF backend.
-
-In addition, this process will also generate a .pc file (pkg-config) for the
-tcplay library.
-
-The classic single-file Makefile can still be used for building, however, using
-
-    make -f Makefile.classic
-
-Or, if you only want the command line tool:
-
-    make -f Makefile.classic tcplay
+add-apt-repository ppa:yubico/stable
+apt install libykpiv-dev libykpers-1-dev libargon2-0-dev libdevmapper-dev uuid-dev libgcrypt20-dev
 
 
 Library
