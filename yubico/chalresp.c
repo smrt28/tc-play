@@ -1,6 +1,6 @@
 #include <stdio.h>
+#include <string.h>
 
-#include <yubikey.h>
 #include <ykdef.h>
 #include <ykcore.h>
 #include <ykstatus.h>
