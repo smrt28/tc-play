@@ -51,18 +51,18 @@ TcPlay handles Yubikey as a device with a key file on it. Surprisingly you can
 pass the key file to TcPlay by the obvious -k argument. To use the PIV secret
 derivation approach, the key file name should be in the following format:
 
-//yubikey/piv/[slot]/[nonce]
+    //yubikey/piv/[slot]/[nonce]
 
 You can also use HMAC challenge-response approach by passing:
 
-//yubikey/chl/[slot]/[nonce]
+    //yubikey/chl/[slot]/[nonce]
 
 Note, HMAC challenge-response doesn't require the PIN.
 
 For instance, to mount the device using Yubikey PIV slot 90 you would use this
 command:
 
-tcplay -d /dev/loop10 -m xxx -k //yubikey/piv/90/a
+    tcplay -d /dev/loop10 -m xxx -k //yubikey/piv/90/a
 
 
 The secret derivation
@@ -87,21 +87,21 @@ yubico-keyfile
 --------------
 
 TcPlay uses Yubikey secret to derive header-key in the same way as
-TrueCrypt/tc-play derives header-key from keyi files. The "yubico-keyfile"
+TrueCrypt/TcPlay derives the header-key from the key files. The "yubico-keyfile"
 utility can obtain the secret from the Yubikey for you and store it in the
-file. You can backup the file. It would work as a keyfile as well as your
+file. You can backup the file. The keyfile would work as well as your
 Yubikey.
 
-yubico-keyfile -s //yubikey/piv/90/a -o ./keyfile
+    yubico-keyfile -s //yubikey/piv/90/a -o ./keyfile
 
 Then those commands would do the same:
 
 
-# derives secret from the yubikey device
-tcplay -d /dev/loop10 -m xxx -k //yubikey/piv/90/a
+    # derives secret from the yubikey device
+    tcplay -d /dev/loop10 -m xxx -k //yubikey/piv/90/a
 
-# reads the same device from the key file
-tcplay -d /dev/loop10 -m xxx -k ./keyfile
+    # reads the same device from the key file
+    tcplay -d /dev/loop10 -m xxx -k ./keyfile
 
 
 New algorithm
@@ -147,8 +147,8 @@ On Ubuntu, the following dev packages are needed to build tcplay:
 
 Following packages are needed to enable Yubico and Argon2 support: 
 
-add-apt-repository ppa:yubico/stable
-apt install libykpiv-dev libykpers-1-dev libargon2-0-dev libdevmapper-dev uuid-dev libgcrypt20-dev
+    add-apt-repository ppa:yubico/stable
+    apt install libykpiv-dev libykpers-1-dev libargon2-0-dev libdevmapper-dev uuid-dev libgcrypt20-dev
 
 
 Library
