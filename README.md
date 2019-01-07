@@ -23,7 +23,7 @@ the trial and error approach.
 Yubikey
 ==========
 The goal is to use Yubico stick as a PIN-protected secret provider and use the
-secret to derive the TrueCrypt header-key.
+secret for the TrueCrypt header-key derivation.
 
 It seems there is no proper way to store an arbitrary PIN protected secret on
 the Yubikey. Yubikey has just five data slots which are supposed to be holding
