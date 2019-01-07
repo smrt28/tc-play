@@ -68,20 +68,18 @@ command:
 The secret derivation
 ---------------------
 
-tc-play uses Yubikey to derive the secret from the nonce within the key file
-path. If you enter the yubikey file name without the nonce part like
-//yubikey/piv/90, the disk encryption password would be used instead.
+tc-play uses Yubikey for derivating a secret from the nonce defined by the key
+file path. If you enter the Yubikey key file name without the nonce part like
+//yubikey/piv/90, the disk encryption password would be used as a nonce.
 
-PBKF2 with Blake2 hash algorithm and 1000 iterations derives a chunk of 256
-bytes (2048 bits) from the nonce.
-
-The very first bit of the chunk is masked out to ensure that the number it
-represents, is lower then RSA2048 modulus.
+PBKF2 with nonce, Blake2 hash algorithm and 1000 iterations derives a 2048bits
+(256 bytes) number. The very first bit if the number is masked out to ensure
+that the number is lower then RSA2048 modulus.
 
 The chunk is passed to the given Yubico slot decipher function which returns
-the result of the RSA formula c^d mod m where d is private hidden on Yubikey.
-PBKF2 with 10 iterations derives the final secret. The final 512bit secret will
-be used as the key file content.
+the result of the obvious RSA formula (c^d mod m) and PBKF2 with 10 iterations
+derives the final secret. The final 512bit secret will be used as the key file
+content.
 
 yubico-keyfile
 --------------
@@ -100,7 +98,7 @@ Then those commands would do the same:
     # derives secret from the yubikey device
     tcplay -d /dev/loop10 -m xxx -k //yubikey/piv/90/a
 
-    # reads the same device from the key file
+    # reads the same secret from the key file where it was saved before
     tcplay -d /dev/loop10 -m xxx -k ./keyfile
 
 
