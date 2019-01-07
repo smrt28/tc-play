@@ -47,8 +47,8 @@ youbikey to generate it for you by itself:
 
     yubico-piv-tool -a generate -s 82
 
-TcPlay handles Yubikey as a device with a key file on it. Surprisingly you can
-pass the key file to TcPlay by the obvious -k argument. To use the PIV secret
+tc-play handles Yubikey as a device with a key file on it. Surprisingly you can
+pass the key file to tc-play by the obvious -k argument. To use the PIV secret
 derivation approach, the key file name should be in the following format:
 
     //yubikey/piv/[slot]/[nonce]
@@ -68,7 +68,7 @@ command:
 The secret derivation
 ---------------------
 
-TcPlay uses Yubikey to derive the secret from the nonce within the key file
+tc-play uses Yubikey to derive the secret from the nonce within the key file
 path. If you enter the yubikey file name without the nonce part like
 //yubikey/piv/90, the disk encryption password would be used instead.
 
@@ -86,8 +86,8 @@ be used as the key file content.
 yubico-keyfile
 --------------
 
-TcPlay uses Yubikey secret to derive header-key in the same way as
-TrueCrypt/TcPlay derives the header-key from the key files. The "yubico-keyfile"
+tc-play uses Yubikey secret to derive header-key in the same way as
+TrueCrypt/tc-play derives the header-key from the key files. The "yubico-keyfile"
 utility can obtain the secret from the Yubikey for you and store it in the
 file. You can backup the file. The keyfile would work as well as your
 Yubikey.
