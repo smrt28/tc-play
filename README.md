@@ -1,5 +1,15 @@
 About
 ==========
+
+This is a modified experimental tcplay version.
+
+Major changes:
+
+* new Crypto/Hash algorithm (Camellia and Argon2).
+* tcplay doesn't create backup header by default. It makes the container emergency wipe much easier.
+* Support for Yubikey security hardware devices
+* Uses autoconf for building
+
 tcplay is a free (BSD-licensed), pretty much fully featured (including multiple
 keyfiles, cipher cascades, etc) and stable TrueCrypt implementation.
 
@@ -47,8 +57,8 @@ youbikey to generate it for you by itself:
 
     yubico-piv-tool -a generate -s 82
 
-tc-play handles Yubikey as a device with a key file on it. Surprisingly you can
-pass the key file to tc-play by the obvious -k argument. To use the PIV secret
+tcplay handles Yubikey as a device with a key file on it. Surprisingly you can
+pass the key file to tcplay by the obvious -k argument. To use the PIV secret
 derivation approach, the key file name should be in the following format:
 
     //yubikey/piv/[slot]/[nonce]
@@ -68,7 +78,7 @@ command:
 The secret derivation
 ---------------------
 
-tc-play uses Yubikey for derivating a secret from the nonce defined by the key
+tcplay uses Yubikey for derivating a secret from the nonce defined by the key
 file path. If you enter the Yubikey key file name without the nonce part like
 //yubikey/piv/90, the disk encryption password would be used as a nonce.
 
@@ -84,8 +94,8 @@ content.
 yubico-keyfile
 --------------
 
-tc-play uses Yubikey secret to derive header-key in the same way as
-TrueCrypt/tc-play derives the header-key from the key files. The "yubico-keyfile"
+tcplay uses Yubikey secret to derive header-key in the same way as
+TrueCrypt/tcplay derives the header-key from the key files. The "yubico-keyfile"
 utility can obtain the secret from the Yubikey for you and store it in the
 file. You can backup the file. The keyfile would work as well as your
 Yubikey.
@@ -106,6 +116,7 @@ New algorithm
 =============
 
 crypto: CAMELLIA
+
 hashing: Argon2 - needs 1GB memory
 
 
