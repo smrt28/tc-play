@@ -49,40 +49,48 @@ static void print_slots() {
 printf(
 #ifdef HAVE_YK_CHL
 "CHL slots\n"
-"   //yubikey/chl/1\n"
-"   //yubikey/chl/2\n"
+"   //yubikey/chl/1/[nonce]\n"
+"   //yubikey/chl/2/[nonce]\n"
 "\n"
 #endif
 #ifdef HAVE_YK_PIV
 "PIV slots available:\n"
-"   AUTHENTICATION //yubikey/piv/9a\n"
-"   SIGNATURE      //yubikey/piv/9c\n"
-"   KEYMGM         //yubikey/piv/9d\n"
-"   CARDAUTH       //yubikey/piv/9e\n"
+"   AUTHENTICATION //yubikey/piv/9a/[nonce]\n"
+"   SIGNATURE      //yubikey/piv/9c/[nonce]\n"
+"   KEYMGM         //yubikey/piv/9d/[nonce]\n"
+"   CARDAUTH       //yubikey/piv/9e/[nonce]\n"
 "\n"
 "PIV slots only available on the YubiKey 4 and 5:\n"
-"   RETIRED-01 //yubikey/piv/82\n"
-"   RETIRED-02 //yubikey/piv/83\n"
-"   RETIRED-03 //yubikey/piv/84\n"
-"   RETIRED-04 //yubikey/piv/85\n"
-"   RETIRED-05 //yubikey/piv/86\n"
-"   RETIRED-06 //yubikey/piv/87\n"
-"   RETIRED-07 //yubikey/piv/88\n"
-"   RETIRED-08 //yubikey/piv/89\n"
-"   RETIRED-09 //yubikey/piv/8a\n"
-"   RETIRED-10 //yubikey/piv/8b\n"
-"   RETIRED-11 //yubikey/piv/8c\n"
-"   RETIRED-12 //yubikey/piv/8d\n"
-"   RETIRED-13 //yubikey/piv/8e\n"
-"   RETIRED-14 //yubikey/piv/8f\n"
-"   RETIRED-15 //yubikey/piv/90\n"
-"   RETIRED-16 //yubikey/piv/91\n"
-"   RETIRED-17 //yubikey/piv/92\n"
-"   RETIRED-18 //yubikey/piv/93\n"
-"   RETIRED-19 //yubikey/piv/94\n"
-"   RETIRED-20 //yubikey/piv/95\n"
-#endif
+"   RETIRED_01 //yubikey/piv/82/[nonce]\n"
+"   RETIRED_02 //yubikey/piv/83/[nonce]\n"
+"   RETIRED_03 //yubikey/piv/84/[nonce]\n"
+"   RETIRED_04 //yubikey/piv/85/[nonce]\n"
+"   RETIRED_05 //yubikey/piv/86/[nonce]\n"
+"   RETIRED_06 //yubikey/piv/87/[nonce]\n"
+"   RETIRED_07 //yubikey/piv/88/[nonce]\n"
+"   RETIRED_08 //yubikey/piv/89/[nonce]\n"
+"   RETIRED_09 //yubikey/piv/8a/[nonce]\n"
+"   RETIRED_10 //yubikey/piv/8b/[nonce]\n"
+"   RETIRED_11 //yubikey/piv/8c/[nonce]\n"
+"   RETIRED_12 //yubikey/piv/8d/[nonce]\n"
+"   RETIRED_13 //yubikey/piv/8e/[nonce]\n"
+"   RETIRED_14 //yubikey/piv/8f/[nonce]\n"
+"   RETIRED_15 //yubikey/piv/90/[nonce]\n"
+"   RETIRED_16 //yubikey/piv/91/[nonce]\n"
+"   RETIRED_17 //yubikey/piv/92/[nonce]\n"
+"   RETIRED_18 //yubikey/piv/93/[nonce]\n"
+"   RETIRED_19 //yubikey/piv/94/[nonce]\n"
+"   RETIRED_20 //yubikey/piv/95/[nonce]\n"
 );
+
+const struct tc_ykpiv_protected_object_t *o = tc_ykpiv_get_protected_objects();
+printf("\nPIV protected objects:\n");
+for (;o->id;++o) {
+    printf("   0x%x\t//yubikey/obj/%s\n", o->id, o->name);
+}
+
+#endif
+
 }
 
 
@@ -225,6 +233,37 @@ err:
 
     return rv;
 }
+
+
+int handle_obj(const char *pin, struct tc_yubico_key *key, const char *keyfile, char *errmsg) {
+    int rv = 0;
+    unsigned char *secret = NULL;
+    char *pinbuf = NULL;
+    unsigned long len = 3072;
+
+    secret = alloc_safe_mem(len);
+
+    if (!secret) CERROR(ERR_YK_GENERAL, "Can't allocate memory for secret!");
+    memset(secret, 0, YKPIV_SECRET_LEN);
+
+    if (!pin) {
+        pinbuf = alloc_safe_mem(YKPIV_PIN_BUF_SIZE);
+        if (!pinbuf) CERROR(ERR_YK_GENERAL, "Can't allocate memory for bin buffer!");
+
+        if ((rv = tc_ykpiv_getpin(pinbuf, errmsg)) != 0) goto err;
+        pin = pinbuf;
+    }
+
+    rv = tc_fetch_object(pin, key->slot, secret, &len, errmsg);
+    if (rv != 0) goto err;
+
+    print_hex(secret, len);
+    if ((rv = write_keyfile(keyfile, secret, len, errmsg)) != 0) goto err;
+
+err:
+    free_safe_mem(secret);
+    return rv;
+}
 #endif
 
 int main(int argc, char **argv) {
@@ -258,7 +297,7 @@ int main(int argc, char **argv) {
         if (c == -1) break;
         switch (c) {
             case 's':
-                if (strcmp(optarg, "list") == 0) {
+                if (strcmp(optarg, "list") == 0 || strcmp(optarg, "help") == 0) {
                     print_slots();
                     return 1;
                 }
@@ -295,6 +334,10 @@ int main(int argc, char **argv) {
         case YUBIKEY_METHOD_PIV:
             rv = handle_piv(pin, &key, keyfile, errmsg);
             break;
+        case YUBIKEY_METHOD_OBJ:
+            rv = handle_obj(pin, &key, keyfile, errmsg);
+            break;
+
 #endif
 #ifdef HAVE_YK_CHL
         case YUBIKEY_METHOD_CHL:

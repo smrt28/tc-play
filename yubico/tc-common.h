@@ -15,6 +15,7 @@ struct tc_yubico_key {
 #define YUBIKEY_METHOD_INVALID 0
 #define YUBIKEY_METHOD_CHL  1
 #define YUBIKEY_METHOD_PIV  2
+#define YUBIKEY_METHOD_OBJ  3
 
 #define ERR_MESSAGE_LEN 1024
 #define YUBIKEY_PATH_PREFIX "//yubikey/"

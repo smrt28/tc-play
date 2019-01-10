@@ -19,6 +19,15 @@ static int is_number(const char *s) {
 }
 */
 
+static int objname2id(const char *obj_name) {
+    const struct tc_ykpiv_protected_object_t *o = tc_ykpiv_get_protected_objects();
+    for (;o->id; ++o) {
+        if (strcmp(o->name, obj_name) == 0) return o->id;
+    }
+    return 0;
+}
+
+
 /*
  * YubiKey keyfile path format is:
  *
@@ -54,10 +63,12 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
     } else if (*path == 'p') { // piv
         prefix = "piv/";
         type = YUBIKEY_METHOD_PIV;
+    } else if (*path == 'o') {
+        prefix = "obj/";
+        type = YUBIKEY_METHOD_OBJ;
     } else {
         CERROR(-1, "Invalit Yubikey path. Should be: "
                 "//yubikey/chl/[1,2] or //yubikey/piv/[slot]");
-
     }
 
     while (*prefix) {
@@ -81,6 +92,12 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
             break;
 #endif
 #ifdef HAVE_YK_PIV
+        case YUBIKEY_METHOD_OBJ:
+            slot = objname2id(path);
+            if (slot == 0) {
+                CERROR(-1, "Unknown object: %s", path);
+            }
+            break;
         case YUBIKEY_METHOD_PIV:
             slot = strtol(path, NULL, 16);
             break;
@@ -92,16 +109,21 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
     yk->type = type;
     yk->slot = slot;
 
-    while (*path != '/') {
-        ++path;
-        if (*path == 0) return type;
-    }
-    ++path;
 
-    len = strlen(path);
-    if (len > sizeof(yk->secret)) CERROR(-1, "Yubikey path is too long");
-    memcpy(yk->secret, path, len);
-    yk->secret_len = len;
+    if (type != YUBIKEY_METHOD_OBJ) {
+        while (*path != '/') {
+            ++path;
+            if (*path == 0) return type;
+        }
+        ++path;
+
+        len = strlen(path);
+        if (len > sizeof(yk->secret)) CERROR(-1, "Yubikey path is too long");
+        memcpy(yk->secret, path, len);
+        yk->secret_len = len;
+    }
+
+
     return type;
 
 err:

@@ -16,6 +16,19 @@
 #define KEY_LEN 24
 #define YKPIV_ENCRYPTED_SECRET_LEN 256
 
+
+static struct tc_ykpiv_protected_object_t secret_objects[] = {
+    { "fingerprints", YKPIV_OBJ_FINGERPRINTS },
+    { "facial", YKPIV_OBJ_FACIAL },
+    { "printed", YKPIV_OBJ_PRINTED },
+    { "iris", YKPIV_OBJ_IRIS },
+    { 0, 0 }
+};
+
+const struct tc_ykpiv_protected_object_t * tc_ykpiv_get_protected_objects(void) {
+    return secret_objects;
+}
+
 static int init_and_verify(struct ykpiv_state **state,
         const char *pin, char *errmsg)
 {
@@ -97,5 +110,25 @@ int  tc_ykpiv_fetch_secret(int slot, const char * pin,
 err:
     free_safe_mem(ciphertext);
     free_safe_mem(plaintext);
+    if (state) ykpiv_done(state);
+    return rv;
+}
+
+
+int tc_fetch_object(const char *pin, int id, unsigned char * secret, unsigned long *len, char *errmsg) {
+    int rv = 0;
+    struct ykpiv_state *state = NULL;
+
+    rv = init_and_verify(&state, pin, errmsg);
+    if (rv) goto err;
+
+    if (ykpiv_authenticate(state, 0) != YKPIV_OK)
+        CERROR(-1, "ykpiv_authenticate failed");
+
+    if (ykpiv_fetch_object(state, id, secret, len) != YKPIV_OK)
+        CERROR(ERR_YK_INPUT, "can't fetch object");
+
+err:
+    if (state) ykpiv_done(state);
     return rv;
 }

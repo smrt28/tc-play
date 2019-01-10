@@ -231,11 +231,11 @@ apply_keyfiles(unsigned char *pass, size_t pass_memsz, const char *keyfiles[],
 #ifdef HAVE_YUBIKEY
     int yktype;
     struct tc_yubico_key yk;
-
     char errmsg[ERR_MESSAGE_LEN];
 #endif
 
 #ifdef HAVE_YK_PIV
+    unsigned long piv_obj_len;
     char *ykpin = NULL;
 #endif
 
@@ -260,6 +260,21 @@ apply_keyfiles(unsigned char *pass, size_t pass_memsz, const char *keyfiles[],
 #ifdef HAVE_YUBIKEY
     yktype = tc_parse_yubikey_path(keyfiles[k], &yk, errmsg);
     if (yktype != 0) {
+
+#ifdef HAVE_YK_PIV
+        if ((yktype == YUBIKEY_METHOD_PIV || yktype == YUBIKEY_METHOD_OBJ) && !ykpin) {
+            ykpin = alloc_safe_mem(YKPIV_PIN_BUF_SIZE);
+            if (!ykpin) {
+                tc_log(1, "Error allocating memory for piv PIN\n");
+                rv = ENOMEM; goto err;
+            }
+            if (tc_ykpiv_getpin(ykpin, errmsg) != 0) {
+                tc_log(1, "error: %s", errmsg);
+                rv = EIO; goto err;
+            }
+        }
+#endif // HAVE_YK_PIV
+
         switch (yktype) {
 #ifdef HAVE_YK_CHL
             case YUBIKEY_METHOD_CHL:
@@ -282,24 +297,12 @@ apply_keyfiles(unsigned char *pass, size_t pass_memsz, const char *keyfiles[],
 #endif
 #ifdef HAVE_YK_PIV
             case YUBIKEY_METHOD_PIV:
-                if (!ykpin) {
-                    ykpin = alloc_safe_mem(YKPIV_PIN_BUF_SIZE);
-                    if (!ykpin) {
-                        tc_log(1, "Error allocating memory for piv PIN\n");
-                        rv = ENOMEM; goto err;
-                    }
-                    kdata = alloc_safe_mem(YKPIV_SECRET_LEN);
-                    if (!kdata) {
-                        tc_log(1, "Error allocating memory for piv secret\n");
-                        rv = ENOMEM; goto err;
-                    }
-                    kdata_sz = YKPIV_SECRET_LEN;
+                kdata = alloc_safe_mem(YKPIV_SECRET_LEN);
+                if (!kdata) {
+                    tc_log(1, "Error allocating memory for piv secret\n");
+                    rv = ENOMEM; goto err;
                 }
-
-                if (tc_ykpiv_getpin(ykpin, errmsg) != 0) {
-                    tc_log(1, "error: %s", errmsg);
-                    rv = EIO; goto err;
-                }
+                kdata_sz = YKPIV_SECRET_LEN;
 
                 if (yk.secret_len == 0) {
                     if (tc_ykpiv_fetch_secret(yk.slot, ykpin, kdata, YKPIV_SECRET_LEN,
@@ -321,6 +324,15 @@ apply_keyfiles(unsigned char *pass, size_t pass_memsz, const char *keyfiles[],
                 printf("TC_YK_DEBUG: yubico-piv-secret(len=%d): ", YKPIV_SECRET_LEN);
                 print_hex(kdata, YKPIV_SECRET_LEN);
 #endif
+                break;
+            case YUBIKEY_METHOD_OBJ:
+                piv_obj_len = 3072; // 3KB
+                kdata = calloc_safe_mem(piv_obj_len);
+                if (tc_fetch_object(ykpin, yk.slot, kdata, &piv_obj_len, errmsg) != 0) {
+                    tc_log(1, "error: %s\n", errmsg);
+                    rv = EIO; goto err;
+                }
+                kdata_sz = piv_obj_len;
                 break;
 #endif // HAVE_YK_PIV
             case -1:
