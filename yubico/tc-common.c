@@ -67,19 +67,19 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
         prefix = "obj/";
         type = YUBIKEY_METHOD_OBJ;
     } else {
-        CERROR(-1, "Invalit Yubikey path. Should be: "
+        GERROR("Invalit Yubikey path. Should be: "
                 "//yubikey/chl/[1,2] or //yubikey/piv/[slot]");
     }
 
     while (*prefix) {
         if (*path != *prefix) {
-            CERROR(-1, "Invalit Yubikey path. Should be: "
+            GERROR("Invalit Yubikey path. Should be: "
                     "//yubikey/chl/[1,2] or //yubikey/piv/[slot]");
         }
         ++path; ++prefix;
     }
 
-    if (*path == 0) CERROR(-1, "Slot number's missing in Yubikey path");
+    if (*path == 0) GERROR("Slot number's missing in Yubikey path");
 
 
     switch(type) {
@@ -87,7 +87,7 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
         case YUBIKEY_METHOD_CHL:
             slot = atoi(path);
             if (slot < 1 || slot > 2)
-                CERROR(-1, "Invalid slot number. "
+                GERROR("Invalid slot number. "
                         "Should be: //yubikey/chl/[1,2]");
             break;
 #endif
@@ -95,7 +95,7 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
         case YUBIKEY_METHOD_OBJ:
             slot = objname2id(path);
             if (slot == 0) {
-                CERROR(-1, "Unknown object: %s", path);
+                GERROR("Unknown object: %s", path);
             }
             break;
         case YUBIKEY_METHOD_PIV:
@@ -104,7 +104,7 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
 #endif
     }
 
-    if (slot == 0) CERROR(-1, "Invalid slot");
+    if (slot == 0) GERROR("Invalid slot");
 
     yk->type = type;
     yk->slot = slot;
@@ -118,7 +118,7 @@ int tc_parse_yubikey_path(const char *path, struct tc_yubico_key *yk,
         ++path;
 
         len = strlen(path);
-        if (len > sizeof(yk->secret)) CERROR(-1, "Yubikey path is too long");
+        if (len > sizeof(yk->secret)) GERROR("Yubikey path is too long");
         memcpy(yk->secret, path, len);
         yk->secret_len = len;
     }

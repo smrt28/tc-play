@@ -21,4 +21,12 @@
         rv = code; \
         goto err; } while(0)
 
+
+#define GERROR(format, ...) \
+    do { snprintf(errmsg, ERR_MESSAGE_LEN, format, ##__VA_ARGS__); \
+        errmsg[ERR_MESSAGE_LEN - 1] = 0; \
+        rv = ERR_YK_GENERAL; \
+        goto err; } while(0)
+
+
 #endif

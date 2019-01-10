@@ -306,14 +306,14 @@ apply_keyfiles(unsigned char *pass, size_t pass_memsz, const char *keyfiles[],
 
                 if (yk.secret_len == 0) {
                     if (tc_ykpiv_fetch_secret(yk.slot, ykpin, kdata, YKPIV_SECRET_LEN,
-                        pass, MAX_PASSSZ, errmsg) != 0)
+                                pass, MAX_PASSSZ, errmsg) != 0)
                     {
                         tc_log(1, "error: %s\n", errmsg);
                         rv = EIO; goto err;
                     }
                 } else {
                     if (tc_ykpiv_fetch_secret(yk.slot, ykpin, kdata, YKPIV_SECRET_LEN,
-                        yk.secret, MAX_PASSSZ, errmsg) != 0)
+                                yk.secret, MAX_PASSSZ, errmsg) != 0)
                     {
                         tc_log(1, "error: %s\n", errmsg);
                         rv = EIO; goto err;

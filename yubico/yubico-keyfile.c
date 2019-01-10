@@ -187,7 +187,6 @@ err:
 int handle_piv(const char *pin, struct tc_yubico_key *key, const char *keyfile, char *errmsg) {
     int rv = 0;
     unsigned char *secret = NULL;
-    int fd = -1;
     char *pinbuf = NULL;
     int len;
     unsigned char *pass = NULL;
@@ -229,8 +228,6 @@ err:
     free_safe_mem(secret);
     free_safe_mem(pinbuf);
     free_safe_mem(pass);
-    if (fd >= 0) close(fd);
-
     return rv;
 }
 
@@ -262,6 +259,7 @@ int handle_obj(const char *pin, struct tc_yubico_key *key, const char *keyfile, 
 
 err:
     free_safe_mem(secret);
+    free_safe_mem(pinbuf);
     return rv;
 }
 #endif
@@ -337,7 +335,6 @@ int main(int argc, char **argv) {
         case YUBIKEY_METHOD_OBJ:
             rv = handle_obj(pin, &key, keyfile, errmsg);
             break;
-
 #endif
 #ifdef HAVE_YK_CHL
         case YUBIKEY_METHOD_CHL:
