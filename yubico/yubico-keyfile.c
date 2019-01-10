@@ -184,28 +184,42 @@ err:
 #endif
 
 #ifdef HAVE_YK_PIV
+static int ask_for_pin(const char **pin, char **pinbuf, char *errmsg) {
+    int rv = 0;
+
+    *pinbuf = NULL;
+
+    if (*pin) return 0;
+
+    *pinbuf = alloc_safe_mem(YKPIV_PIN_BUF_SIZE);
+    if (!*pinbuf) GERROR("Can't allocate memory for bin buffer!");
+
+    if ((rv = tc_ykpiv_getpin(*pinbuf, errmsg)) != 0) goto err;
+    *pin = *pinbuf;
+    return 0;
+
+err:
+    free_safe_mem(*pinbuf);
+    *pinbuf = NULL;
+    return rv;
+}
+
+
 int handle_piv(const char *pin, struct tc_yubico_key *key, const char *keyfile, char *errmsg) {
     int rv = 0;
     unsigned char *secret = NULL;
     char *pinbuf = NULL;
-    int len;
+    int len = 0;
     unsigned char *pass = NULL;
+
+    if ((rv = ask_for_pin(&pin, &pinbuf, errmsg)) != 0) goto err;
+
+    pass = calloc_safe_mem(MAX_PASSSZ);
+    if (!pass) CERROR(ERR_YK_GENERAL, "can't allocate memory");
 
     secret = alloc_safe_mem(YKPIV_SECRET_LEN);
     if (!secret) CERROR(ERR_YK_GENERAL, "Can't allocate memory for secret!");
     memset(secret, 0, YKPIV_SECRET_LEN);
-
-    len = 0;
-    if (!pin) {
-        pinbuf = alloc_safe_mem(YKPIV_PIN_BUF_SIZE);
-        if (!pinbuf) CERROR(ERR_YK_GENERAL, "Can't allocate memory for bin buffer!");
-
-        if ((rv = tc_ykpiv_getpin(pinbuf, errmsg)) != 0) goto err;
-        pin = pinbuf;
-    }
-
-    pass = calloc_safe_mem(MAX_PASSSZ);
-    if (!pass) CERROR(ERR_YK_GENERAL, "can't allocate memory");
 
     if (key->secret_len > 0) {
         memcpy(pass, key->secret, key->secret_len);
@@ -238,18 +252,11 @@ int handle_obj(const char *pin, struct tc_yubico_key *key, const char *keyfile, 
     char *pinbuf = NULL;
     unsigned long len = 3072;
 
-    secret = alloc_safe_mem(len);
+    if ((rv = ask_for_pin(&pin, &pinbuf, errmsg)) != 0) goto err;
 
+    secret = alloc_safe_mem(len);
     if (!secret) CERROR(ERR_YK_GENERAL, "Can't allocate memory for secret!");
     memset(secret, 0, YKPIV_SECRET_LEN);
-
-    if (!pin) {
-        pinbuf = alloc_safe_mem(YKPIV_PIN_BUF_SIZE);
-        if (!pinbuf) CERROR(ERR_YK_GENERAL, "Can't allocate memory for bin buffer!");
-
-        if ((rv = tc_ykpiv_getpin(pinbuf, errmsg)) != 0) goto err;
-        pin = pinbuf;
-    }
 
     rv = tc_fetch_object(pin, key->slot, secret, &len, errmsg);
     if (rv != 0) goto err;
