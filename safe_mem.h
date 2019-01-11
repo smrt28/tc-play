@@ -7,6 +7,8 @@ void *_alloc_safe_mem(size_t req_sz, const char *file, int line);
 void *_calloc_safe_mem(size_t req_sz, const char *file, int line);
 void *_strdup_safe_mem(const char *in, const char *file, int line);
 void _free_safe_mem(void *mem, const char *file, int line);
+void * _realloc_safe_mem(void *mem_ptr, size_t cb, const char *file, int line);
+
 void check_and_purge_safe_mem(void);
 int enable_safe_mem_global_lock(void);
 
@@ -29,5 +31,7 @@ int enable_safe_mem_global_lock(void);
 #define free_safe_mem(x) \
     _free_safe_mem(__DECONST(void *, x), __FILE__, __LINE__)
 
+#define realloc_safe_mem(mem, cb) \
+    _realloc_safe_mem(mem, cb, __FILE__, __LINE__)
 
 #endif

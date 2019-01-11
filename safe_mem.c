@@ -113,6 +113,24 @@ void * _alloc_safe_mem(size_t req_sz, const char *file, int line)
 }
 
 
+void * _realloc_safe_mem(void *mem_ptr, size_t cb, const char *file, int line) {
+    if (!mem_ptr) return alloc_safe_mem(cb);
+    if (cb == 0) {
+        free_safe_mem(mem_ptr);
+        return NULL;
+    }
+
+    char *mem = mem_ptr;
+    size_t orig_size = ((struct safe_mem_hdr *)(mem - sizeof(struct safe_mem_hdr)))->alloc_sz;
+    orig_size -= sizeof(struct safe_mem_hdr);
+    orig_size -= sizeof(struct safe_mem_tail);
+    void * new_mem = _calloc_safe_mem(cb, file, line);
+    if (!new_mem) return NULL;
+    memcpy(new_mem, mem_ptr, orig_size);
+    free_safe_mem(mem_ptr);
+    return new_mem;
+}
+
 void * _calloc_safe_mem(size_t req_sz, const char *file, int line) {
     void * rv = _alloc_safe_mem(req_sz, file, line);
     if (!rv) return NULL;

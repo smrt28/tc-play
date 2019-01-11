@@ -29,14 +29,36 @@ const struct tc_ykpiv_protected_object_t * tc_ykpiv_get_protected_objects(void) 
     return secret_objects;
 }
 
+static void * _pfn_alloc(void *data, size_t size) {
+    (void)data;
+    return calloc_safe_mem(size);
+}
+
+static void _pfn_free(void *data, void *p) {
+    (void)data;
+    free_safe_mem(p);
+}
+
+static void * _pfn_realloc(void *data, void *p, size_t cb) {
+    (void)data;
+    return realloc_safe_mem(p, cb);
+}
+
 static int init_and_verify(struct ykpiv_state **state,
         const char *pin, char *errmsg)
 {
     int rv = 0, tries = 0;
-
+    int yrv;
     *state = NULL;
 
-    if (ykpiv_init(state, YK_DEBUG) != YKPIV_OK)
+    ykpiv_allocator a;
+    a.pfn_alloc = _pfn_alloc;
+    a.pfn_free = _pfn_free;
+    a.pfn_realloc = _pfn_realloc;
+
+    // yrv = ykpiv_init(state, YK_DEBUG);
+    yrv = ykpiv_init_with_allocator(state, YK_DEBUG, &a);
+    if (yrv != YKPIV_OK)
         CERROR(ERR_YK_INIT, "Yubikey init failed");
 
     if (ykpiv_connect(*state, NULL) != YKPIV_OK)
